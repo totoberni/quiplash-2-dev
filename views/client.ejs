@@ -4,13 +4,31 @@
     <%- include('header'); -%>
 
     <h2 class="title">Alberto's Quiplash Game</h2>
-
+    <br>
     <div id="game">
-        <div v-if="connected">
-            <%- include('chat'); -%>
+        <div v-if="loggedIn">
+            <div v-if="connected">
+                <%- include('chat'); -%>
+            </div>
+            <div v-else>
+                <p>Connecting...</p>
+            </div>
         </div>
         <div v-else>
-            <p>Connecting...</p>
+            <div class="auth-form">
+                <p v-if="errorMsg" class="alert alert-danger">{{ errorMsg }}</p>
+                <p v-if="successMsg" class="alert alert-success">{{ successMsg }}</p>
+
+                <h3 class = "title">Login or Register</h3>
+                <div class="mb-4">
+                    <input type="text" v-model="username" placeholder="Username" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <input type="password" v-model="password" placeholder="Password" class="form-control">
+                </div>
+                <button @click="login" class="btn btn-primary">Login</button>
+                <button @click="register" class="btn btn-secondary">Register</button>
+            </div>
         </div>
     </div>
 

@@ -1,22 +1,36 @@
+// app.js
 'use strict';
 
-//Set up express
+// Set up express
 const express = require('express');
 const app = express();
 
-//Setup socket.io
+// Setup socket.io
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 
-//Setup static page handling
+// Import controllers
+const chatController = require('./server/controllers/chatController');
+chatController(io);
+
+const authController = require('./server/controllers/authController');
+
+// Middleware to parse JSON request bodies
+app.use(express.json());
+
+// Setup static page handling
 app.set('view engine', 'ejs');
 app.use('/static', express.static('public'));
 
-//Handle client interface on /
+// Use authController routes
+app.use('/', authController);
+
+// Handle client interface on /
 app.get('/', (req, res) => {
   res.render('client');
 });
-//Handle display interface on /display
+
+// Handle display interface on /display
 app.get('/display', (req, res) => {
   res.render('display');
 });
@@ -24,7 +38,7 @@ app.get('/display', (req, res) => {
 // URL of the backend API
 const BACKEND_ENDPOINT = process.env.BACKEND || 'http://localhost:8181';
 
-//Start the server
+// Start the server
 function startServer() {
     const PORT = process.env.PORT || 8080;
     server.listen(PORT, () => {
@@ -32,28 +46,7 @@ function startServer() {
     });
 }
 
-//Chat message
-function handleChat(message) {
-    console.log('Handling chat: ' + message); 
-    io.emit('chat',message);
-}
-
-//Handle new connection
-io.on('connection', socket => { 
-  console.log('New connection');
-
-  //Handle on chat message received
-  socket.on('chat', message => {
-    handleChat(message);
-  });
-
-  //Handle disconnection
-  socket.on('disconnect', () => {
-    console.log('Dropped connection');
-  });
-});
-
-//Start server
+// Start server
 if (module === require.main) {
   startServer();
 }
