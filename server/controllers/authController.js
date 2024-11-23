@@ -5,11 +5,11 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 
-// URL of the backend API
+// Use the Azure endpoint
 const BACKEND_ENDPOINT = process.env.BACKEND || 'http://localhost:8181';
 
 // Registration Route
-router.post('/register', async (req, res) => {
+router.post('/player/register', async (req, res) => {
     console.log('Handling registration');
     console.log('Request body:', req.body);
 
@@ -19,13 +19,13 @@ router.post('/register', async (req, res) => {
     if (username.length < 4 || username.length > 15) {
         return res.json({ result: false, msg: 'Username less than 5 characters or more than 15 characters' });
     }
-    if (password.length < 4 || password.length > 15) {
+    if (password.length < 8 || password.length > 15) {
         return res.json({ result: false, msg: 'Password less than 8 characters or more than 15 characters' });
     }
 
     try {
-        // Make a request to the backend API
-        const response = await axios.post(`${BACKEND_ENDPOINT}/register`, { username, password });
+        // Make a POST request to the backend API and wait for the response
+        const response = await axios.post(`${BACKEND_ENDPOINT}/player/register`, { username, password });
         console.log('Backend API response:', response.data);
         res.json(response.data);
     } catch (error) {
@@ -42,7 +42,7 @@ router.post('/player/login', async (req, res) => {
     const { username, password } = req.body;
 
     try {
-        // Make a request to the backend API
+        // Make a POST request to the backend API and wait for the response
         const response = await axios.post(`${BACKEND_ENDPOINT}/player/login`, { username, password });
         console.log('Backend API response:', response.data);
         res.json(response.data);

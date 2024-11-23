@@ -1,4 +1,4 @@
-// game.js
+// public/game.js
 var socket = null;
 
 // Prepare game
@@ -26,6 +26,7 @@ var app = new Vue({
             this.chatmessage = '';
         },
         register() {
+            console.log('Register method called');
             this.errorMsg = '';
             this.successMsg = '';
             axios.post('/player/register', {
@@ -46,6 +47,7 @@ var app = new Vue({
             });
         },
         login() {
+            console.log('Login method called');
             this.errorMsg = '';
             this.successMsg = '';
             axios.post('/player/login', {

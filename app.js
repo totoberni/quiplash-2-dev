@@ -23,7 +23,7 @@ app.set('view engine', 'ejs');
 app.use('/static', express.static('public'));
 
 // Use authController routes
-app.use('/', authController);
+app.use(authController);
 
 // Handle client interface on /
 app.get('/', (req, res) => {
