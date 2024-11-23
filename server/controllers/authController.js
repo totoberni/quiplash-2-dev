@@ -6,13 +6,16 @@ const router = express.Router();
 const axios = require('axios');
 
 // Use the Azure endpoint
-const BACKEND_ENDPOINT = process.env.BACKEND || 'http://localhost:8181';
+const BACKEND_ENDPOINT = process.env.BACKEND || 'http://127.0.0.1:8181';
 
 // Registration Route
 router.post('/player/register', async (req, res) => {
     console.log('Handling registration');
     console.log('Request body:', req.body);
 
+// try to implement a GET method instead of POST
+// Maybe error is in syntax of the request
+// Try with your own backend API
     const { username, password } = req.body;
 
     // Validate username and password length

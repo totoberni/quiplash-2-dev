@@ -14,6 +14,7 @@ const chatController = require('./server/controllers/chatController');
 chatController(io);
 
 const authController = require('./server/controllers/authController');
+const { default: axios } = require('axios');
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
@@ -23,7 +24,7 @@ app.set('view engine', 'ejs');
 app.use('/static', express.static('public'));
 
 // Use authController routes
-app.use(authController);
+app.use('/', authController);
 
 // Handle client interface on /
 app.get('/', (req, res) => {
@@ -37,7 +38,6 @@ app.get('/display', (req, res) => {
 
 // URL of the backend API
 const BACKEND_ENDPOINT = process.env.BACKEND || 'http://localhost:8181';
-
 // Start the server
 function startServer() {
     const PORT = process.env.PORT || 8080;
@@ -46,9 +46,27 @@ function startServer() {
     });
 }
 
+// test if the server is running
+// const PORT = process.env.PORT || 8181;
+// app.listen(PORT, '127.0.0.1', () => {
+//     console.log(`Backend server listening on http://127.0.0.1:${PORT}`);
+// });
+
 // Start server
 if (module === require.main) {
   startServer();
 }
+
+// Test registration
+// Example route
+// app.post('/player/register', (req, res) => {
+//   const { username, password } = req.body;
+//   // Implement your registration logic here
+//   if (username === 'testuser' && password === 'testpass') {
+//     res.json({ result: true, msg: 'Registration successful!' });
+//   } else {
+//     res.status(401).json({ result: false, msg: 'Invalid credentials.' });
+//   }
+// });
 
 module.exports = server;

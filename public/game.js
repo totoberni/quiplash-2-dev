@@ -22,8 +22,12 @@ var app = new Vue({
             this.messages.unshift(message);
         },
         chat() {
-            socket.emit('chat', this.chatmessage);
-            this.chatmessage = '';
+            if (socket) {
+                socket.emit('chat', this.chatmessage);
+                this.chatmessage = '';
+            } else {
+                this.errorMsg = 'Not connected to the server.';
+            }
         },
         register() {
             console.log('Register method called');
