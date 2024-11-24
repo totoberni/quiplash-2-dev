@@ -11,9 +11,9 @@ const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 
-// Import controllers
-const chatController = require('./server/controllers/chatController');
-chatController(io);
+// Import socketUtils and initialize sockets
+const socketUtils = require('./server/utils/socketUtils');
+socketUtils.initializeSocket(io);
 
 const authController = require('./server/controllers/authController');
 const { default: axios } = require('axios');

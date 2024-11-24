@@ -8,6 +8,7 @@ var app = new Vue({
         loggedIn: false,
         username: '',
         password: '',
+        sessionId: '', // Store the session ID
         messages: [],
         chatmessage: '',
         errorMsg: '',
@@ -22,7 +23,7 @@ var app = new Vue({
         },
         chat() {
             if (socket) {
-                socket.emit('chat', this.chatmessage);
+                socket.emit('chat', { message: this.chatmessage });
                 this.chatmessage = '';
             } else {
                 this.errorMsg = 'Not connected to the server.';
@@ -62,8 +63,10 @@ var app = new Vue({
                 if (response.data.result) {
                     this.loggedIn = true;
                     this.successMsg = 'Login successful!';
+                    // Store the sessionId
+                    this.sessionId = response.data.sessionId;
                     // Now connect to socket.io
-                    connect();
+                    connect(this.sessionId);
                 } else {
                     this.errorMsg = response.data.msg;
                 }
@@ -76,9 +79,13 @@ var app = new Vue({
     }
 });
 
-function connect() {
-    // Prepare web socket
-    socket = io();
+function connect(sessionId) {
+    // Prepare web socket with authentication
+    socket = io({
+        auth: {
+            sessionId: sessionId
+        }
+    });
 
     // Connect
     socket.on('connect', function() {
@@ -87,8 +94,9 @@ function connect() {
     });
 
     // Handle connection error
-    socket.on('connect_error', function(message) {
-        alert('Unable to connect: ' + message);
+    socket.on('connect_error', function(error) {
+        console.error('Connection error:', error.message);
+        alert('Unable to connect: ' + error.message);
     });
 
     // Handle disconnection
@@ -101,4 +109,8 @@ function connect() {
     socket.on('chat', function(message) {
         app.handleChat(message);
     });
+
+    // Handle other events as needed
+    // Example:
+    // socket.on('newPrompt', function(data) { ... });
 }

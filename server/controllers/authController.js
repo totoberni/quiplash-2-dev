@@ -6,6 +6,9 @@ const router = express.Router();
 // Import apiUtils
 const apiUtils = require('../utils/apiUtils');
 
+// Import sessionStore
+const { sessionStore, generateSessionId } = require('../utils/sessionStore');
+
 // Registration Route
 router.post('/player/register', async (req, res) => {
   console.log('Handling registration');
@@ -14,7 +17,7 @@ router.post('/player/register', async (req, res) => {
   const { username, password } = req.body;
 
   // Validate username and password length
-  if (username.length < 4 || username.length > 15) {
+  if (username.length < 5 || username.length > 15) {
     return res.json({ result: false, msg: 'Username less than 5 characters or more than 15 characters' });
   }
   if (password.length < 8 || password.length > 15) {
@@ -43,7 +46,20 @@ router.post('/player/login', async (req, res) => {
     // Use apiUtils to log in the player
     const responseData = await apiUtils.loginPlayer(username, password);
     console.log('API response:', responseData);
-    res.json(responseData);
+
+    if (responseData.result) {
+      // Generate a session ID
+      const sessionId = generateSessionId();
+
+      // Store the session ID associated with the username
+      sessionStore[sessionId] = { username };
+
+      // Send the session ID back to the client
+      res.json({ result: true, msg: 'OK', sessionId });
+    } else {
+      res.json(responseData);
+    }
+
   } catch (error) {
     console.error('Error during login:', error.message);
     res.status(500).json({ result: false, msg: 'Internal server error' });
