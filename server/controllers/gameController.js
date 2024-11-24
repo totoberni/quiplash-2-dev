@@ -1,174 +1,164 @@
-// server/controllers/gameController.js
+// controllers/gameController.js
 
 'use strict';
 
+const playerManager = require('../utils/playerManager');
+const gameLogic = require('../utils/gameLogic');
 const apiUtils = require('../utils/apiUtils');
-const { sessionStore } = require('../utils/sessionStore');
-// Import gameLogic if needed
-// const gameLogic = require('../gameLogic/gameLogic'); // Uncomment if gameLogic is used
 
-// Example in-memory storage for demonstration purposes
-// In production, consider using a database or persistent storage
-let players = []; // Array of player objects
-let audience = []; // Array of audience member objects
-let prompts = []; // Array of prompt objects
-let currentGameState = 'waitingForPlayers'; // Initial game state
-let leaderboard = []; // Array of player scores
-
-// Handler for chat messages
-exports.handleChatMessage = (socket, data, io) => {
+/**
+ * Handles chat messages via Socket.IO.
+ */
+function handleChatMessage(socket, data, io) {
+  const username = socket.user;
   const message = data.message;
-  const username = socket.user;
 
-  console.log(`Chat message from ${username}: ${message}`);
-
-  // Broadcast the message to all connected clients in the format "username: message"
-  io.emit('chat', `${username}: ${message}`);
-};
-
-// Handler for prompt submissions
-exports.handlePrompt = async (socket, data, io) => {
-  const username = socket.user;
-  const promptText = data.promptText;
-
-  console.log(`Prompt submitted by ${username}: ${promptText}`);
-
-  // Validate prompt length
-  if (promptText.length < 20 || promptText.length > 100) {
-    socket.emit('errorMessage', 'Prompt must be between 20 and 100 characters.');
+  if (!message || typeof message !== 'string') {
+    socket.emit('error', { message: 'Invalid message.' });
     return;
   }
 
-  try {
-    // Use apiUtils to create the prompt in the backend
-    const response = await apiUtils.createPrompt(username, promptText);
+  // Broadcast chat message to all clients
+  io.emit('chatMessage', { username, message });
+}
 
-    if (response.result) {
-      // Add the prompt to the local prompts list
-      prompts.push({ id: response.promptId, username, text: promptText });
-
-      // Notify all clients about the new prompt
-      io.emit('newPrompt', { username, text: promptText });
-
-      // Optionally, acknowledge the sender
-      socket.emit('promptAcknowledged', 'Your prompt has been submitted successfully.');
-    } else {
-      // Handle failure in prompt creation
-      socket.emit('errorMessage', response.msg || 'Failed to create prompt.');
-    }
-  } catch (error) {
-    console.error('Error handling prompt submission:', error.message);
-    socket.emit('errorMessage', 'An error occurred while submitting the prompt.');
-  }
-};
-
-// Handler for answer submissions
-exports.handleAnswer = (socket, data, io) => {
-  const username = socket.user;
-  const answerText = data.answerText;
-  const promptId = data.promptId;
-
-  console.log(`Answer submitted by ${username} for prompt ${promptId}: ${answerText}`);
-
-  // TODO: Implement logic to store the answer and associate it with the prompt and player
-  // Example:
-  // gameLogic.storeAnswer(username, promptId, answerText);
-
-  // Notify all clients that an answer has been received
-  io.emit('answerReceived', { username, promptId, answerText });
-
-  // Optionally, acknowledge the sender
-  socket.emit('answerAcknowledged', 'Your answer has been submitted successfully.');
-};
-
-// Handler for voting
-exports.handleVote = (socket, data, io) => {
-  const username = socket.user;
-  const answerId = data.answerId;
-
-  console.log(`Vote received from ${username} for answer ${answerId}`);
-
-  // TODO: Implement voting logic
-  // Example:
-  // gameLogic.recordVote(username, answerId);
-
-  // Notify all clients about the vote
-  io.emit('voteReceived', { username, answerId });
-
-  // Optionally, acknowledge the sender
-  socket.emit('voteAcknowledged', 'Your vote has been recorded.');
-};
-
-// Handler for generating a prompt suggestion (e.g., using a keyword)
-exports.handleGeneratePrompt = async (socket, data, io) => {
+/**
+ * Handles prompt generation via Socket.IO.
+ */
+function handleGeneratePrompt(socket, data) {
   const keyword = data.keyword;
+
+  apiUtils.suggestPrompt(keyword)
+    .then((suggestion) => {
+      socket.emit('promptSuggestion', { suggestion });
+    })
+    .catch((error) => {
+      console.error('Prompt generation error:', error);
+      socket.emit('error', { message: 'Failed to generate prompt.' });
+    });
+}
+
+/**
+ * Handles prompt submission via Socket.IO.
+ */
+function handlePrompt(socket, data, io) {
   const username = socket.user;
+  const promptText = data.promptText;
 
-  console.log(`Prompt generation requested by ${username} with keyword: ${keyword}`);
-
-  try {
-    // Use apiUtils to get a prompt suggestion from the backend
-    const response = await apiUtils.suggestPrompt(keyword);
-
-    if (response.suggestion) {
-      // Emit the suggestion back to the requesting client
-      socket.emit('promptSuggestion', response.suggestion);
-    } else {
-      socket.emit('errorMessage', 'No suggestion could be generated.');
-    }
-  } catch (error) {
-    console.error('Error generating prompt suggestion:', error.message);
-    socket.emit('errorMessage', 'An error occurred while generating the prompt suggestion.');
+  if (!promptText || promptText.length < 20 || promptText.length > 100) {
+    socket.emit('error', {
+      message: 'Prompt must be between 20 and 100 characters.',
+    });
+    return;
   }
-};
 
-// Handler for selecting a prompt (admin action)
-exports.handleSelectPrompt = (socket, data, io) => {
+  const result = gameLogic.submitPrompt(username, promptText);
+  if (result.success) {
+    // After successfully adding the prompt to game logic, create the prompt via API
+    apiUtils.createPrompt(username, promptText)
+      .then(() => {
+        socket.emit('promptResult', { success: true });
+        io.emit('promptCountUpdate', {
+          count: gameLogic.getPromptCount(),
+        });
+        // Check if all prompts are received
+        if (gameLogic.allPromptsReceived()) {
+          gameLogic.advanceGameState(io);
+        }
+      })
+      .catch((error) => {
+        console.error('Prompt submission error:', error);
+        socket.emit('error', { message: 'Failed to submit prompt to backend.' });
+      });
+  } else {
+    socket.emit('error', { message: result.message });
+  }
+}
+
+/**
+ * Handles answer submission via Socket.IO.
+ */
+function handleAnswer(socket, data, io) {
   const username = socket.user;
-  const promptId = data.promptId;
+  const { promptId, answerText } = data;
 
-  console.log(`Prompt selected by ${username}: ${promptId}`);
+  if (!answerText || answerText.length < 5 || answerText.length > 200) {
+    socket.emit('error', {
+      message: 'Answer must be between 5 and 200 characters.',
+    });
+    return;
+  }
 
-  // TODO: Implement logic to mark the prompt as selected for the current game
-  // Example:
-  // gameLogic.selectPrompt(promptId);
+  const result = gameLogic.submitAnswer(username, promptId, answerText);
+  if (result.success) {
+    socket.emit('answerResult', { success: true });
+    // Check if all answers are received
+    if (gameLogic.allAnswersReceived()) {
+      gameLogic.advanceGameState(io);
+    }
+  } else {
+    socket.emit('error', { message: result.message });
+  }
+}
 
-  // Notify all clients that a prompt has been selected
-  io.emit('promptSelected', promptId);
+/**
+ * Handles vote submission via Socket.IO.
+ */
+function handleVote(socket, data, io) {
+  const username = socket.user;
+  const { promptId, selectedAnswerUsername } = data;
 
-  // Optionally, acknowledge the sender
-  socket.emit('selectPromptAcknowledged', 'Prompt has been selected for the game.');
-};
+  const result = gameLogic.submitVote(
+    username,
+    promptId,
+    selectedAnswerUsername
+  );
 
-// Handler for advancing the game state (admin action)
-exports.handleAdvance = (socket, io) => {
+  if (result.success) {
+    socket.emit('voteResult', { success: true });
+    // Check if all votes are received
+    if (gameLogic.allVotesReceived()) {
+      gameLogic.advanceGameState(io);
+    }
+  } else {
+    socket.emit('error', { message: result.message });
+  }
+}
+
+/**
+ * Handles game advancement via Socket.IO.
+ */
+function handleAdvance(socket, data, io) {
   const username = socket.user;
 
-  console.log(`Game advancement requested by ${username}`);
+  if (!playerManager.isAdmin(username)) {
+    socket.emit('error', { message: 'Only admin can advance the game.' });
+    return;
+  }
 
-  // TODO: Implement logic to advance the game state
-  // Example:
-  // gameLogic.advanceState();
+  const result = gameLogic.advanceGameState(io);
+  if (result.success) {
+    io.emit('phaseChange', { phase: gameLogic.getPhase() });
+  } else {
+    socket.emit('error', { message: result.message });
+  }
+}
 
-  // Notify all clients about the state advancement
-  io.emit('gameAdvanced', { newState: currentGameState });
-
-  // Optionally, acknowledge the sender
-  socket.emit('advanceAcknowledged', 'Game state has been advanced.');
-};
-
-// Handler for client disconnection
-exports.handleDisconnect = (socket, io) => {
+/**
+ * Handles user disconnection via Socket.IO.
+ */
+function handleDisconnect(socket, io) {
   const username = socket.user;
+  playerManager.removeUserBySocketId(socket.id);
+  io.emit('message', { message: `${username} has disconnected.` });
+}
 
-  console.log(`Client disconnected: ${socket.id}, User: ${username}`);
-
-  // TODO: Implement logic to remove the player from the game or handle cleanup
-  // Example:
-  // gameLogic.removePlayer(username);
-
-  // Notify all clients about the disconnection
-  io.emit('playerDisconnected', username);
+module.exports = {
+  handleChatMessage,
+  handleGeneratePrompt,
+  handlePrompt,
+  handleAnswer,
+  handleVote,
+  handleAdvance,
+  handleDisconnect,
 };
-
-// Additional handler functions can be added here following the same pattern
