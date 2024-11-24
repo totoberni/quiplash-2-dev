@@ -13,7 +13,7 @@
 ├── server
 │   └── controllers
 │       ├── authController.js
-│       └── chatController.js
+│       └── gameController.js
 └── views
     ├── chat.ejs
     ├── client.ejs

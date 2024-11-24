@@ -48,9 +48,7 @@ function handlePrompt(socket, data, io) {
   const promptText = data.promptText;
 
   if (!promptText || promptText.length < 20 || promptText.length > 100) {
-    socket.emit('error', {
-      message: 'Prompt must be between 20 and 100 characters.',
-    });
+    socket.emit('error', {message: 'Prompt must be between 20 and 100 characters.',});
     return;
   }
 
@@ -59,18 +57,10 @@ function handlePrompt(socket, data, io) {
     // After successfully adding the prompt to game logic, create the prompt via API
     apiUtils.createPrompt(username, promptText)
       .then(() => {
-        socket.emit('promptResult', { success: true });
-        io.emit('promptCountUpdate', {
-          count: gameLogic.getPromptCount(),
-        });
-        // Check if all prompts are received
-        if (gameLogic.allPromptsReceived()) {
-          gameLogic.advanceGameState(io);
-        }
-      })
+        socket.emit('Prompt Submitted!', { success: true });})
       .catch((error) => {
         console.error('Prompt submission error:', error);
-        socket.emit('error', { message: 'Failed to submit prompt to backend.' });
+        socket.emit('error', { message: 'Failed to submit prompt to backend'});
       });
   } else {
     socket.emit('error', { message: result.message });

@@ -132,4 +132,22 @@ module.exports = {
       throw error;
     }
   },
+
+  // Get Prompts
+  async getPrompts(players, language) {
+    console.log('API: getPrompts called');
+    try {
+      const response = await axios.get(`${BACKEND_ENDPOINT}utils/get`, {
+        params: {
+          players: players,
+          language : language
+        },
+      });
+      console.log('Backend API response:', response.data);
+      return response.data; // Expected to have an array of prompts
+    } catch (error) {
+      console.error('API getPrompts Error:', error.message);
+      throw error;
+    }
+  },
 };
