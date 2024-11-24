@@ -1,5 +1,5 @@
 <div>
-    <input type="text" @keyup.enter="chat()" v-model="chatmessage" class="form-control" placeholder="Chat">
+    <input type="text" @keyup.enter="chat()" v-model="chatmessage" class="form-control" placeholder="Type here">
     <ul id="chat">
         <li v-for="message in messages">{{message}}</li>
     </ul>

@@ -15,9 +15,6 @@ const io = require('socket.io')(server);
 const socketUtils = require('./server/utils/socketUtils');
 socketUtils.initializeSocket(io);
 
-const authController = require('./server/controllers/authController');
-const { default: axios } = require('axios');
-
 // Middleware to parse JSON request bodies
 app.use(express.json());
 
@@ -26,6 +23,7 @@ app.set('view engine', 'ejs');
 app.use('/static', express.static('public'));
 
 // Use authController routes
+const authController = require('./server/controllers/authController');
 app.use(authController);
 
 // Handle client interface on /

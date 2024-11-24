@@ -15,7 +15,8 @@ var app = new Vue({
         successMsg: ''
     },
     methods: {
-        handleChat(message) {
+        handleChat(data) {
+            const message = data.username + ': ' + data.message;
             if (this.messages.length + 1 > 10) {
                 this.messages.pop();
             }
@@ -106,8 +107,8 @@ function connect(sessionId) {
     });
 
     // Handle incoming chat message
-    socket.on('chat', function(message) {
-        app.handleChat(message);
+    socket.on('chat', function(data) {
+        app.handleChat(data);
     });
 
     // Handle other events as needed

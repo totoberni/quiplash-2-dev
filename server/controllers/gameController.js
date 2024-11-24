@@ -6,6 +6,8 @@ const playerManager = require('../utils/playerManager');
 const gameLogic = require('../utils/gameLogic');
 const apiUtils = require('../utils/apiUtils');
 
+
+
 /**
  * Handles chat messages via Socket.IO.
  */
@@ -18,8 +20,8 @@ function handleChatMessage(socket, data, io) {
     return;
   }
 
-  // Broadcast chat message to all clients
-  io.emit('chatMessage', { username, message });
+  console.log(`Handling chat from ${username}: ${message}`);
+  io.emit('chat', { username: username, message: message });
 }
 
 /**
