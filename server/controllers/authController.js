@@ -1,4 +1,3 @@
-// authController.js
 'use strict';
 
 const express = require('express');
@@ -6,20 +5,20 @@ const router = express.Router();
 const axios = require('axios');
 
 // Use the Azure endpoint
-const BACKEND_ENDPOINT = process.env.BACKEND || 'http://127.0.0.1:8181';
+const BACKEND_ENDPOINT = process.env.BACKEND || 'http://127.0.0.1:7071/api/';
+
+// Optional: Log the BACKEND_ENDPOINT for debugging
+console.log('Backend Endpoint:', BACKEND_ENDPOINT);
 
 // Registration Route
 router.post('/player/register', async (req, res) => {
     console.log('Handling registration');
     console.log('Request body:', req.body);
 
-// try to implement a GET method instead of POST
-// Maybe error is in syntax of the request
-// Try with your own backend API
     const { username, password } = req.body;
 
     // Validate username and password length
-    if (username.length < 4 || username.length > 15) {
+    if (username.length < 5 || username.length > 15) {
         return res.json({ result: false, msg: 'Username less than 5 characters or more than 15 characters' });
     }
     if (password.length < 8 || password.length > 15) {
@@ -28,7 +27,7 @@ router.post('/player/register', async (req, res) => {
 
     try {
         // Make a POST request to the backend API and wait for the response
-        const response = await axios.post(`${BACKEND_ENDPOINT}/player/register`, { username, password });
+        const response = await axios.post(`${BACKEND_ENDPOINT}player/register`, { username, password });
         console.log('Backend API response:', response.data);
         res.json(response.data);
     } catch (error) {
@@ -46,7 +45,7 @@ router.post('/player/login', async (req, res) => {
 
     try {
         // Make a POST request to the backend API and wait for the response
-        const response = await axios.post(`${BACKEND_ENDPOINT}/player/login`, { username, password });
+        const response = await axios.post(`${BACKEND_ENDPOINT}player/login`, { username, password });
         console.log('Backend API response:', response.data);
         res.json(response.data);
     } catch (error) {

@@ -1,4 +1,3 @@
-// public/game.js
 var socket = null;
 
 // Prepare game
