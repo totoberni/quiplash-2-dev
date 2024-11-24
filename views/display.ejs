@@ -3,19 +3,164 @@
 
     <%- include('header'); -%>
 
+    <body>
     <h2 class="title">ECS Example Game</h2>
 
     <div id="game">
         <div v-if="connected">
-            <ul id="chat">
-                <li v-for="message in messages">{{message}}</li>
-            </ul>
+            <!-- Game Stages -->
+
+            <!-- Waiting for Players -->
+            <div v-if="currentStage === 'waitingForPlayers'">
+                <h3>Waiting for Players</h3>
+                <p>Players joined so far:</p>
+                <ul>
+                    <li v-for="player in players">{{ player.username }}</li>
+                </ul>
+                <p>Please join the game at: <strong>{{ joinURL }}</strong></p>
+            </div>
+
+            <!-- Prompt Suggestion -->
+            <div v-else-if="currentStage === 'promptSuggestion'">
+                <h3>Prompt Suggestion</h3>
+                <p>Prompts suggested so far:</p>
+                <ul>
+                    <li v-for="prompt in prompts">{{ prompt.text }} by {{ prompt.username }}</li>
+                </ul>
+                <p>Total prompts suggested: {{ prompts.length }}</p>
+            </div>
+
+            <!-- Answers Being Received -->
+            <div v-else-if="currentStage === 'answersReceived'">
+                <h3>Answers Being Received</h3>
+                <p>Players who have answered:</p>
+                <ul>
+                    <li v-for="player in playersAnswered">{{ player.username }}</li>
+                </ul>
+                <p>Waiting on:</p>
+                <ul>
+                    <li v-for="player in playersWaiting">{{ player.username }}</li>
+                </ul>
+            </div>
+
+            <!-- Voting in Progress -->
+            <div v-else-if="currentStage === 'votingInProgress'">
+                <h3>Voting in Progress</h3>
+                <p>Prompt: {{ currentPrompt.text }}</p>
+                <p>Answers:</p>
+                <ul>
+                    <li>{{ currentPrompt.answers[0] }}</li>
+                    <li>{{ currentPrompt.answers[1] }}</li>
+                </ul>
+            </div>
+
+            <!-- Voting Results -->
+            <div v-else-if="currentStage === 'votingResults'">
+                <h3>Voting Results</h3>
+                <p>Prompt: {{ currentPrompt.text }}</p>
+                <p>Answers and Results:</p>
+                <ul>
+                    <li>
+                        <strong>{{ currentPrompt.answers[0] }}</strong> by {{ currentPrompt.answerAuthors[0] }} - {{ currentPrompt.answerPoints[0] }} points
+                    </li>
+                    <li>
+                        <strong>{{ currentPrompt.answers[1] }}</strong> by {{ currentPrompt.answerAuthors[1] }} - {{ currentPrompt.answerPoints[1] }} points
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Scores -->
+            <div v-else-if="currentStage === 'scores'">
+                <h3>Current Leaderboard</h3>
+                <ol>
+                    <li v-for="player in leaderboard">
+                        {{ player.username }} - {{ player.score }} points
+                    </li>
+                </ol>
+            </div>
+
+            <!-- Game Over -->
+            <div v-else-if="currentStage === 'gameOver'">
+                <h3>Game Over</h3>
+                <p>Final Leaderboard:</p>
+                <ol>
+                    <li v-for="player in leaderboard">
+                        {{ player.username }} - {{ player.score }} points
+                    </li>
+                </ol>
+                <p>Congratulations to the winners!</p>
+            </div>
+
         </div>
         <div v-else>
             <p>Connecting...</p>
         </div>
     </div>
 
+    <!-- Placeholder for scripts -->
+    <!-- Include Vue.js -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+
+    <!-- Include Socket.IO -->
+    <!-- <script src="/socket.io/socket.io.js"></script> -->
+    <!-- Uncomment the above line when socket.io is set up -->
+
+    <script>
+        // Placeholder for the display client logic
+
+        var app = new Vue({
+            el: '#game',
+            data: {
+                connected: false,
+                currentStage: 'waitingForPlayers', // initial stage
+                players: [], // list of players
+                joinURL: '', // URL to join the game
+                prompts: [], // list of prompts suggested
+                playersAnswered: [], // players who have answered
+                playersWaiting: [], // players who are being waited on
+                currentPrompt: {
+                    text: '',
+                    answers: [],
+                    answerAuthors: [],
+                    answerPoints: []
+                },
+                leaderboard: [] // list of players with scores
+            },
+            methods: {
+                // Placeholder methods to handle socket events and update the game state
+            },
+            mounted: function() {
+                // Placeholder for socket connection
+                // Initialize socket.io connection and set up event listeners
+                // Uncomment the following lines when socket.io is set up
+                /*
+                var socket = io();
+
+                socket.on('connect', function() {
+                    app.connected = true;
+                });
+
+                socket.on('disconnect', function() {
+                    app.connected = false;
+                });
+
+                // Handle game state updates from the server
+                socket.on('gameStateUpdate', function(data) {
+                    app.currentStage = data.currentStage;
+                    app.players = data.players;
+                    app.joinURL = data.joinURL;
+                    app.prompts = data.prompts;
+                    app.playersAnswered = data.playersAnswered;
+                    app.playersWaiting = data.playersWaiting;
+                    app.currentPrompt = data.currentPrompt;
+                    app.leaderboard = data.leaderboard;
+                });
+                */
+            }
+        });
+    </script>
+
     <%- include('footer'); -%>
 
+    </body>
 </html>

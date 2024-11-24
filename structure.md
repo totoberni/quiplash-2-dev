@@ -6,6 +6,7 @@
 ├── package-lock.json
 ├── package.json
 ├── Procfile
+├── .env
 ├── public
 │   ├── game.js
 │   └── ... (other static assets like CSS, images, etc.)
