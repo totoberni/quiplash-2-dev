@@ -88,12 +88,13 @@ module.exports = {
   },
 
   // Edit Player
-  async editPlayer(username, data) {
+  async editPlayer(username, add_to_games_played, add_to_score) {
     console.log('API: editPlayer called with:', { username, data });
     try {
       const response = await axios.post(`${BACKEND_ENDPOINT}player/update`, {
         username,
-        ...data,
+        add_to_games_played,
+        add_to_score
       });
       console.log('Backend API response:', response.data);
       return response.data; // Expected response indicating update status

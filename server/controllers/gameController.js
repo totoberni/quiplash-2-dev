@@ -5,6 +5,7 @@
 const playerManager = require('../utils/playerManager');
 const gameLogic = require('../utils/gameLogic');
 const apiUtils = require('../utils/apiUtils');
+const { json } = require('body-parser');
 
 
 
@@ -29,7 +30,6 @@ function handleChatMessage(socket, data, io) {
  */
 function handleGeneratePrompt(socket, data) {
   const keyword = data.keyword;
-
   apiUtils.suggestPrompt(keyword)
     .then((suggestion) => {
       socket.emit('promptSuggestion', { suggestion });
@@ -55,12 +55,12 @@ function handlePrompt(socket, data, io) {
   const result = gameLogic.submitPrompt(username, promptText);
   if (result.success) {
     // After successfully adding the prompt to game logic, create the prompt via API
-    apiUtils.createPrompt(username, promptText)
+    const response = apiUtils.createPrompt(username, promptText)
       .then(() => {
-        socket.emit('Prompt Submitted!', { success: true });})
+        socket.emit('Prompt Submitted!');})
       .catch((error) => {
-        console.error('Prompt submission error:', error);
-        socket.emit('error', { message: 'Failed to submit prompt to backend'});
+        console.error(`Prompt submission error: ${json.loads(response)["msg"]}`);
+        socket.emit('error', { message: 'Failed to submit prompt to backend' });
       });
   } else {
     socket.emit('error', { message: result.message });
@@ -92,6 +92,8 @@ function handleAnswer(socket, data, io) {
     socket.emit('error', { message: result.message });
   }
 }
+
+
 
 /**
  * Handles vote submission via Socket.IO.
@@ -136,12 +138,26 @@ function handleAdvance(socket, data, io) {
   }
 }
 
+
+
+function updatePlayerBeforeLogout(player) {
+  apiUtils.editPlayer(player.username, player.gamesPlayed, player.score)
+  .then(() => {
+    console.log('Player updated before logout.');
+  })
+  .catch((error) => {
+    console.error('Player update error:', error);
+  });;
+}
+
 /**
  * Handles user disconnection via Socket.IO.
  */
 function handleDisconnect(socket, io) {
   const username = socket.user;
+  updatePlayerBeforeLogout(playerManager.getPlayerByUsername(username));
   playerManager.removeUserBySocketId(socket.id);
+
   io.emit('message', { message: `${username} has disconnected.` });
 }
 

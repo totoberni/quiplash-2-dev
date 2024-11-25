@@ -7,8 +7,9 @@ class Player {
       this.isAdmin = false; // Indicates if the player is the game admin
       this.score = 0; // Total score accumulated by the player
       this.roundScore = 0; // Score accumulated in the current round
+      this.gamesPlayed = 0; // Number of games played by the player
       this.assignedPrompts = []; // ID of prompts assigned to the player for answering
-      this.state = 'active'; // Current state of the player (e.g., active, answered, voted, disconnected)
+      this.state = 'waiting'; // Current state of the player (e.g., waiting, active, answered, voted, disconnected)
       // Additional properties can be added as needed
     }
   }

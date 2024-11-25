@@ -1,248 +1,161 @@
 // utils/playerManager.js
-
+// Handles logic for players and their actions during the game. Shares responsibility with gameLogic.js.
 'use strict';
 
+const gameLogic = require('./gameLogic');
+const apiUtils = require('./apiUtils');
 const Player = require('../models/playerModel');
 
 class PlayerManager {
   constructor() {
-    this.players = {};   // Active players
-    this.audience = {};  // Audience members
+    this.players = {}; // Active players
+    this.admin = null; // Game admin player object
+    this.audience = {}; // Audience members
   }
 
-  //getter for # players
-  getnumPlayers() {
-    return Objecy.keys(this.players).length;
-  }
-
-  getnumAudience() {
-    return Object.keys(this.audience).length;
-  }
-
-  // Add a new player
-  addPlayer(username, socketId) {
-    if (this.players[username] || this.audience[username]) {
-      return false; // Username already taken
+    // Getters 
+    getPlayers() {
+        return Object.values(this.players);
+    }
+    getPlayerByUsername(username) {
+        return this.getPlayers().find((player) => player.username === username);
+    }
+    getAdmin() {
+        return this.getPlayers().find((player) => player.isAdmin);
+    }
+    getAudience() {
+        return Object.values(this.audience);
+    }
+    getAudienceByUsername(username) {
+        return this.getAudience().find((player) => player.username === username);
     }
 
-    if (Object.keys(this.players).length === 8) {
-        this.addAudience(username, socketId);
-        return false; // Room is full
+    // Helpers
+    isPlayer(username) {
+        return this.getPlayerByUsername(username) !== (undefined||null||''); 
     }
-    // First player is admin
-    const isAdmin = Object.keys(this.players).length === 0;
-    const player = new Player(socketId, username, isAdmin);
-    this.players[username] = player;
-    return true;
-  }
-
-  // Add a new audience member
-  addAudience(username, socketId) {
-    if (this.players[username] || this.audience[username]) {
-      return false; // Username already taken
+    isAudience(username) {
+        return !this.isPlayer(username) && this.audience[username] !== (undefined||null||'');
+    }    
+    isAdmin(username) {
+        return this.getAdmin().username === username;
     }
-    const audienceMember = {socketId,username};
-    this.audience[username] = audienceMember;
-    return true;
-  }
-
-  // Handle prompt submission by a player
-  submitPrompt(username) {
-    const player = this.getPlayer(username);  
-    if (
-      !player ||
-      player.state !== 'active' ||
-      player.state === 'submittedPrompt' ||
-      this.audience[username]
-    ) {
-      return { success: false, message: 'Player cannot submit prompts.' };
-    }
-    // Update player's state
-    player.state = 'submittedPrompt';
-    return { success: true };
-  } 
-
-  // total number of prompts submitted
-  promptsSubmitted() {return Object.values(this.players).filter((player) => player.state === 'submittedPrompt').length;}
-
-  // Helper function to assign prompts to players. Handles the player-side of assignment.
-  playerToPrompt(shuffledPlayers, shuffledPrompts) {
-    const numPlayers = shuffledPlayers.length;
-    const numPrompts = shuffledPrompts.length;
-
-    for (let i = 0; i < numPrompts; i++) {
-        let assignedPlayers = [];
-
-        if (numPlayers % 2 === 0) {
-            // Even number of players, each player gets 1 prompt
-            assignedPlayers = [
-                shuffledPlayers[(i * 2) % numPlayers],
-                shuffledPlayers[(i * 2 + 1) % numPlayers]];} 
-        else {
-            // Odd number of players, each player gets 2 prompts
-            assignedPlayers = [
-                shuffledPlayers[i % numPlayers],
-                shuffledPlayers[(i + 1) % numPlayers],];}
-
-        // Assign prompt to players
-        assignedPlayers.forEach((username) => {
-            const player = this.getPlayer(username);
-            if (player) {
-                player.assignedPrompts.push(i);}});
-    }
-  }
-
-  // Handle answer submission by a player
-  submitAnswer(username, promptId) {
-    const player = this.getPlayer(username);
-
-    if (player.state === 'answered') {
-      return { success: false, message: 'Answer already submitted.' };
+    // Reassign admin if current admin disconnects
+    reassignAdmin() {
+        if (this.getAdmin === null && this.getPlayers().length > 0) {this.getPlayers[0].isAdmin = true;} 
+        else {console.log('Cannot reassign admin.');}
     }
 
-    if (!player || !player.assignedPrompts.includes(promptId)) {
-      return { success: false, message: 'Prompt not assigned to you.' };
-    }
-    // add playe's answer to Player model
-    player.answers[promptId] = answerText;
-    player.state = 'answered';
-  
-  }
-  // Count submitted answers
-  answersSubmitted() {
-    return Object.values(this.players).filter((player) => player.state === 'answered').length};
+    // Add new clients
+    addPlayer(username, socketId,) {
+      if (this.isPlayer(username) || this.isAudience(username)) {
+        return false; // Username already taken
+      }
 
-  // Handle voting by a player
-  // Submit a vote
-  submitVote(username, selectedAnswerUsername, gameState) {
-    const voter = this.getPlayer(username) || this.audience[username];
-    if (!voter) {
-      return { success: false, message: 'User not found.' };
+      if (this.getPlayers().length === 8) {
+          this.addAudience(username, socketId);
+          return false; // Room is full
+      }
+      const isAdmin = getPlayers().length === 0; // First player is admin
+      this.players.push(new Player(socketId, username, isAdmin));
+      return true;
     }
-    // Prevent self-voting
-    if (voter.username === selectedAnswerUsername) {
-      return { success: false, message: 'You cannot vote on your own prompt.' };
+    addAudience(username, socketId) {
+      this.audience.push(new Player(socketId, username, false));
+      return true;
     }
 
-    const answers = gameState.answers[prompt.id] || [];
-    const selectedAnswer = answers.find(ans => ans.username === selectedAnswerUsername);
-    if (!selectedAnswer) {
-      return { success: false, message: 'Selected answer does not exist for this prompt.' };
+    // Update clients based on game state
+    updatePlayersOnGameState(gameState) {
+        switch (gameState.phase) {
+            case 'joining':
+                getPlayers().concat(getAudience()).forEach((player) => player.state = 'waiting');
+                break;
+            case 'prompts':
+                getPlayers().concat(getAudience()).forEach((player) => player.state = 'active');
+                break;
+            case 'answers':
+                getAudience().forEach((player) => player.state = 'waiting');
+                getPlayers().forEach((player) => player.state = 'active');
+                break;
+            case 'voting':
+                getPlayers().concat(getAudience()).forEach((player) => player.state = 'active');
+                break;
+            case 'results':
+                updatePlayersAfterVoting(gameState);
+                getPlayers().concat(getAudience()).forEach((player) => player.state = 'waiting');
+                break;
+            case 'scores':
+                getAudience().forEach((audience) => audience.state = "waiting");
+                updatePlayersAfterGame(player);
+                break;
+            case 'endGame':
+                getPlayers().concat(getAudience()).forEach((client) => this.removeUser(client.username)); // figure out what happens here
+            default:
+                console.log('Error updating player states.');
+        }
     }
 
-    // Initialize votes for the prompt and answer if not present
-    if (!this.votes[prompt.id]) {
-      this.votes[prompt.id] = {};
-    }
-    if (!this.votes[prompt.id][selectedAnswerUsername]) {
-      this.votes[prompt.id][selectedAnswerUsername] = new Set();
-    }
-
-    // Check if the voter has already voted for this prompt
-    const hasVoted = Object.values(this.votes[prompt.id]).some(votersSet =>
-      votersSet.has(username)
-    );
-    if (hasVoted) {
-      return { success: false, message: 'You have already voted on this prompt.' };
+    updatePlayersAfterVoting(gameState) {
+        for (entry in gameState.updateScores) {
+            const player = getPlayerByUsername(entry.answerUsername);
+            player.roundScore = gameState.updateScores[entry.answerScore]
+            player.score += roundScore;
+        }
     }
 
-    // Record the vote
-    this.votes[prompt.id][selectedAnswerUsername].add(username);
+    updatePlayersAfterGame(player) {
+        for (player in getPlayers()) {
+            player.gamesPlayed += 1;
+            player.roundScore = 0;
+            player.assignedPrompts = [];
+            player.state = 'waiting';
+            }
+    }
+    
+    // Remove clients
+    removeUser(username) {
+        if (isPlayer(username)) {
+            const playerIndex = this.getPlayers().findIndex((player) => player.username === username);
+            if (playerIndex !== -1) {
+                this.players.splice(playerIndex, 1);
+                if(isAdmin(username)){
+                    this.getPlayerByUsername(username).isAdmin = false;
+                    this.reassignAdmin()};
+                    console.log(`Player ${username} removed.`);
+                return true;
+            }
 
-    // Update voter's state if necessary
-    voter.state = 'voted';
-    return { success: true };
-  }
-
-  // Method to get total votes received (used in gameLogic.js)
-  totalVotes() {
-    let votedPlayers = Object.values(this.players).filter((player) => player.state === 'voted').length;
-    let votedAudience = Object.values(this.audience).filter((audience) => audience.state === 'voted').length;
-    return votedPlayers + votedAudience;
-  }
-
-  // Method to reset votes (used when starting a new round)
-  resetVotes() {
-    this.votes = {};
-  }
-
-  // Remove a user by socket ID
-  removeUserBySocketId(socketId) {
-    const playerEntry = Object.values(this.players).find(
-      (p) => p.socketId === socketId
-    );
-
-    if (playerEntry) {
-      const username = playerEntry.username;
-      delete this.players[username];
-      this.reassignAdmin();
-      return username;
+        } else if (isAudience(username)) {
+            const audienceIndex = this.getAudience().findIndex((player) => player.username === username);
+            if (audienceIndex !== -1) {
+                this.audience.splice(audienceIndex, 1);
+                console.log(`Audience member ${username} removed.`);
+                return true;
+            }
+        } else {
+            console.log('Error removing user.');
+            return false; // Username not found
+        }
+    }
+    removeUserBySocketId(socketId) {
+        // Check if player or audience member
+        const playerSocketId = Object.values(this.players).find((p) => p.socketId === socketId);
+        const audienceSocketId = Object.values(this.audience).find((a) => a.socketId === socketId);
+      
+        if (playerSocketId || audienceSocketId) {
+            const username = playerSocketId?.username || audienceSocketId?.username;
+            this.removeUser(username);
+            console.log('Player removed.');
+            return true;
+        }
+        
+        else{
+            console.log('User not found. Could not remove user.');
+            return false;
+        }
     }
 
-    const audienceEntry = Object.values(this.audience).find(
-      (a) => a.socketId === socketId
-    );
-    if (audienceEntry) {
-      const username = audienceEntry.username;
-      delete this.audience[username];
-      return username;
-    }
-
-    return null;
-  }
-
-  // Reassign admin if current admin disconnects
-  reassignAdmin() {
-    const remainingPlayers = Object.values(this.players);
-    if (remainingPlayers.length > 0) {
-      remainingPlayers[0].isAdmin = true;
-    }
-  }
-
-  // Get player by username
-  getPlayer(username) {
-    return this.players[username] || null;
-  }
-
-  // Get player by socket ID
-  getPlayerBySocketId(socketId) {
-    return Object.values(this.players).find(
-      (p) => p.socketId === socketId
-    ) || null;
-  }
-
-  // Check if user is in the game
-  isUserInGame(username) {
-    return (
-      this.players.hasOwnProperty(username) ||
-      this.audience.hasOwnProperty(username)
-    );
-  }
-
-  // Get username by socket ID
-  getUsernameBySocketId(socketId) {
-    const player = this.getPlayerBySocketId(socketId);
-    if (player) return player.username;
-
-    const audienceMember = Object.values(this.audience).find(
-      (a) => a.socketId === socketId
-    );
-    return audienceMember ? audienceMember.username : null;
-  }
-
-  // Check if a user is admin
-  isAdmin(username) {
-    const player = this.getPlayer(username);
-    return player ? player.isAdmin : false;
-  }
-
-  // Update player's state
-  updatePlayerState(username, state) {
-    const player = this.getPlayer(username);
-    if (player) {
-      player.state = state;
-    }
-  }
 }
 
 module.exports = new PlayerManager();
