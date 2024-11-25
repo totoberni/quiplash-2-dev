@@ -1,3 +1,5 @@
+// game.js
+
 var socket = null;
 
 // Prepare game
@@ -8,11 +10,13 @@ var app = new Vue({
         loggedIn: false,
         username: '',
         password: '',
-        sessionId: '', // Store the session ID
+        sessionId: '',      // Store the session ID
         messages: [],
         chatmessage: '',
         errorMsg: '',
-        successMsg: ''
+        successMsg: '',
+        gameState: null,    // Game state sent from the server
+        playerState: null   // Player-specific state sent from the server
     },
     methods: {
         handleChat(data) {
@@ -76,6 +80,20 @@ var app = new Vue({
                 console.error('Login error:', error);
                 this.errorMsg = 'An error occurred during login.';
             });
+        },
+        startGame() {
+            if (socket) {
+                socket.emit('startGame');
+            } else {
+                this.errorMsg = 'Not connected to the server.';
+            }
+        },
+        joinGame() {
+            if (socket) {
+                socket.emit('joinGame');
+            } else {
+                this.errorMsg = 'Not connected to the server.';
+            }
         }
     }
 });
@@ -111,7 +129,19 @@ function connect(sessionId) {
         app.handleChat(data);
     });
 
-    // Handle other events as needed
-    // Example:
-    // socket.on('newPrompt', function(data) { ... });
+    // Handle game state updates from the server
+    socket.on('gameStateUpdate', function(data) {
+        app.gameState = data.gameState;
+        app.playerState = data.playerState;
+        app.errorMsg = '';
+        app.successMsg = '';
+        // Update the UI based on the new state
+    });
+
+    // Handle errors from the server
+    socket.on('error', function(data) {
+        app.errorMsg = data.message;
+    });
+
+    // Other event handlers as needed
 }

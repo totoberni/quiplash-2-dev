@@ -1,25 +1,56 @@
+<!-- client.ejs -->
+
 <!doctype html>
 <html lang="en">
 
-    <%- include('header'); -%>
+<%- include('header'); -%>
 
-    <h2 class="title">Alberto's Quiplash Game</h2>
-    <br>
+<body>
+<div class="container">
+    <h2 class="title text-center my-4">Alberto's Quiplash Game</h2>
+
     <div id="game">
         <div v-if="loggedIn">
             <div v-if="connected">
-                <%- include('chat'); -%>
+                <!-- User Information -->
+                <div class="user-info mb-3">
+                    <p>Welcome, <strong>{{ username }}</strong>!</p>
+                    <p v-if="successMsg" class="alert alert-success">{{ successMsg }}</p>
+                    <p v-if="errorMsg" class="alert alert-danger">{{ errorMsg }}</p>
+                </div>
+
+                <!-- Game Controls -->
+                <div class="game-controls mb-3">
+                    <div v-if="!gameState || gameState.phase === 'joining'">
+                        <div v-if="playerState && playerState.isAdmin">
+                            <button @click="startGame" class="btn btn-primary">Start Game</button>
+                            <p>You are the game administrator.</p>
+                        </div>
+                        <div v-else>
+                            <p>Waiting for the game to start...</p>
+                        </div>
+                    </div>
+                    <!-- Other game phases -->
+                    <!-- ... -->
+                </div>
+
+                <!-- Chat Section -->
+                <div id="chat-section" class="mt-4">
+                    <h4>Chat Room</h4>
+                    <%- include('chat'); -%>
+                </div>
             </div>
             <div v-else>
                 <p>Connecting...</p>
             </div>
         </div>
         <div v-else>
+            <!-- Authentication Form -->
             <div class="auth-form">
                 <p v-if="errorMsg" class="alert alert-danger">{{ errorMsg }}</p>
                 <p v-if="successMsg" class="alert alert-success">{{ successMsg }}</p>
 
-                <h3 class = "title">Login or Register</h3>
+                <h3 class="title">Login or Register</h3>
                 <div class="mb-4">
                     <input type="text" v-model="username" placeholder="Username" class="form-control">
                 </div>
@@ -31,7 +62,9 @@
             </div>
         </div>
     </div>
+</div>
 
-    <%- include('footer'); -%>
+<%- include('footer'); -%>
+</body>
 
 </html>

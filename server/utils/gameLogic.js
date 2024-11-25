@@ -28,34 +28,8 @@ class GameLogic {
         }
     
     // Getters
-    getPhase() {
-      return this.gameState.phase;
-    }
-    getActivePrompts() {
-        return this.gameState.getActivePrompts;
-    }
-    getSubmittedPrompts() {
-        return this.gameState.submittedPrompts;
-    }
-    getPromptByUsername(dict,username) { // Supports both activePrompts and submittedPrompts
-        return dict.find((prompt) => prompt.username === username);
-    }
-    getAnswers() {
-        return this.gameState.answers;
-    }// may need to add more answer getters
-    getVotes() {
-        return this.gameState.votes;
-    }// getters for votes will be added later
-
-
-    getRoundNumber() {
-        return this.gameState.roundNumber;
-    }
-    getTotalRounds() {
-        return this.gameState.totalRounds;
-    }
-    getTotalScores() {
-        return this.gameState.totalScores;
+    getGameState() {
+        return this.gameState;
     }
 
     // Helpers
@@ -71,6 +45,14 @@ class GameLogic {
             this.gameState.updateScores.push({answerUsername, answerScore});
         }
         return updateScores;
+    }
+
+    halfPromptsReceived() {
+        return this.gameState.submittedPrompts.length >= playerManager.getPlayers().length/2;
+    }
+
+    gameStateUpdate(io) {
+        io.emit('Next Phase', `gameState: ${getGameState().phase}`);
     }
 
     // Game State Management. Each method transitions to the next phase and handles the game logic.
@@ -99,11 +81,46 @@ class GameLogic {
     checkAllPlayersReady(io) {setInterval(() => {
         if (playerManager.getPlayers().length >= 3) {
             this.gameState.phase = 'prompts';
-            io.emit('Next Phase: ', { phase: 'prompts' });
+            this.gameStateUpdate(io);
             clearInterval(this); // Stop checking
-            //return { success: true }; 
         }} , 1000);
         return { success: false, message: 'Waiting for players...' };
+    }
+
+    // Phase 2: Start prompt collection
+    async startPromptCollection(io) {
+        this.gameState.phase = 'prompts';
+        this.gameStateUpdate(io);
+    }
+
+    // Phase 3: Start answer submission
+    async startAnswerSubmission(io) {
+        this.gameState.phase = 'answers';
+        this.gameStateUpdate(io);
+    }
+
+    // Phase 4: Start voting
+    async startVoting(io) {
+        this.gameState.phase = 'voting';
+        this.gameStateUpdate(io);
+    }
+
+    // Phase 5: Show results
+    async showResults(io) {
+        this.gameState.phase = 'results';
+        this.gameStateUpdate(io);
+    }
+
+    // Phase 6: Next round or end game
+    async nextRoundOrEndGame(io) {
+        if (this.gameState.roundNumber < this.gameState.totalRounds) {
+            this.gameState.phase = 'prompts';
+            this.gameState.roundNumber += 1;
+            this.gameStateUpdate(io);
+        } else {
+            this.gameState.phase = 'endGame';
+            this.gameStateUpdate(io);
+        }
     }
 }
 
