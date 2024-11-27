@@ -25,7 +25,7 @@ module.exports.initializeSocket = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id, 'User:', socket.user);
+    console.log('New client connected:', 'Session: ', socket.sessionId ,socket.id, 'User:', socket.user);
 
     // Handle chat messages
     socket.on('chat', (data) => {

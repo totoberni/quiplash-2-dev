@@ -5,7 +5,7 @@
 const axios = require('axios');
 
 // Use the Azure endpoint
-const BACKEND_ENDPOINT = process.env.BACKEND || 'http://127.0.0.1:7071/api/';
+const BACKEND_ENDPOINT = process.env.BACKEND || 'http://127.0.0.1:7071/a pi/';
 
 // Optional: Log the BACKEND_ENDPOINT for debugging
 console.log('Backend Endpoint:', BACKEND_ENDPOINT);
@@ -29,7 +29,7 @@ module.exports = {
 
   // Login
   async loginPlayer(username, password) {
-    console.log('API: loginPlayer called with:', { username, password });
+    console.log('API Player Login called with:', { username, password });
     try {
       const response = await axios.post(`${BACKEND_ENDPOINT}player/login`, {
         username,

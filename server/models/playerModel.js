@@ -1,16 +1,19 @@
 // server/models/playerModel.js
 
 class Player {
-    constructor(socketId, username) {
-      this.socketId = socketId; // Unique identifier for the player's socket connection
-      this.username = username; // Player's username
-      this.isAdmin = false; // Indicates if the player is the game admin
-      this.score = 0; // Total score accumulated by the player
-      this.roundScore = 0; // Score accumulated in the current round
-      this.gamesPlayed = 0; // Number of games played by the player
-      this.assignedPrompts = []; // ID of prompts assigned to the player for answering
-      this.state = 'waiting'; // Current state of the player (e.g., waiting, active, answered, voted, disconnected)
-      // Additional properties can be added as needed
+    constructor(socketId, username, isAdmin) {
+      this.socketId = socketId; 
+      this.username = username; 
+      this.isAdmin = isAdmin; // Admin flag
+      this.score = 0; 
+      this.roundScore = 0; 
+      this.gamesPlayed = 0; 
+      this.submittedPrompts = []; // [promptUsername, text] only 1 prompt can be submitted
+      this.assignedPrompts = []; // [[promptUsername, text]] can contain up to 2 prompts
+      this.answers = []; //[[promptUsername, answerUsername, answer]] can contain up to 2 answers 
+      this.vote = []; // [answerUsername, voteUsername] only 1 vote
+      this.state = 'waiting'; // Keeps track of players' state
+      this.justJoined = true; // Reset at the end of each round
     }
   }
   

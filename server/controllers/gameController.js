@@ -5,28 +5,47 @@
 const playerManager = require('../utils/playerManager');
 const gameLogic = require('../utils/gameLogic');
 const apiUtils = require('../utils/apiUtils');
+const { use } = require('./authController');
+const activeGames  = [];
 
-/**
- * Updates a specific player with the current game and player state.
- */ // needs some work
-function updatePlayer(socket) {
+// Starting a new Game
+function gameStart(socket) {
   const username = socket.user;
-  const gameState = gameLogic.getGameState();
-  const playerState = playerManager.getPlayerState(username);
-  socket.emit('gameStateUpdate', { gameState, playerState });
+  if (username) {
+    activeGames.push([gameLogic(), playerManager()]);
+    playerManager.addPlayer(username, socket.id);
+  } else {
+    socket.emit('error', { message: 'Unable to start the game. User is invalid' });
+  }
 }
 
-/**
- * Updates all connected players with the current game state.
- */
-function updateAllPlayers(io) {
-  const gameState = gameLogic.getGameState();
-  io.emit('gameStateUpdate', { gameState });
+//Joining a Game
+function gameJoin(socket, gameCode) {
+  const username = socket.user;
+  const game = gameSearch(socket, gameCode);
+
+  if (game) {
+    const playerManager = game[1];
+    playerManager.addPlayer(username, socket.id);
+  }
 }
 
-/**
- * Handles chat messages via Socket.IO.
- */
+// Helpers
+function gameSearch(socket, gameCode) {
+  const game = activeGames.find(([gameLogic, _]) => gameLogic.gameState.gameCode === gameCode);
+  if (game) {
+    return game;
+  } else {
+    socket.emit('error', { message: 'Game not found.' });
+  }
+}
+
+// returns the game and playerManager for the socket in binary array
+function findGameBySocketId(socketId) {
+  return activeGames.find(([_, playerManager]) => playerManager.getPlayerBySocketId(socketId));
+}
+
+// Handlers
 function handleChatMessage(socket, data, io) {
   const username = socket.user;
   const message = data.message;
@@ -40,53 +59,33 @@ function handleChatMessage(socket, data, io) {
   io.emit('chat', { username: username, message: message });
 }
 
-/**
- * Handles prompt generation via Socket.IO.
- */
-function handleGeneratePrompt(socket, data) {
-  const keyword = data.keyword;
-  apiUtils.suggestPrompt(keyword)
-    .then((suggestion) => {
-      socket.emit('promptSuggestion', { suggestion });
-    });
-  // Error checking is handled by apiUtils
-}
+// Handles prompt submission via Socket.IO.
 
-/**
- * Handles prompt submission via Socket.IO.
- */
-function handlePrompt(socket, data, io) {
+function handlePromptSubmission(socket, data, io) {
   const username = socket.user;
   const promptText = data.promptText;
 
-  const result = gameLogic.submitPrompt(username, promptText);
+  const result = apiUtils.createPrompt(username, promptText);
   if (result.success) {
-    // After successfully adding the prompt to game logic, create the prompt via API
-    apiUtils.createPrompt(username, promptText)
+    findGameBySocketId(socket.id)[1].submitPrompt(username, promptText)
       .then(() => {
-        socket.emit('promptSubmitted');
+        socket.emit(`${username} submitted a prompt.`);
+      })
+      .catch((err) => {
+        socket.emit('Logic error', { message: err.message });
       });
-    // Error checking is handled by apiUtils
   } else {
-    socket.emit('error', { message: result.message });
+    socket.emit('Server error', { message: result.message });
   }
 }
 
 /**
  * Handles answer submission via Socket.IO.
  */
-function handleAnswer(socket, data, io) {
-  const username = socket.user;
-  const { promptId, answerText } = data;
-
-  const result = gameLogic.submitAnswer(username, promptId, answerText);
+function handleAnswerSubmission(socket, data, io) {
+  const payload = {"answerUsername": socket.user, "text":data.text};
   if (result.success) {
-    socket.emit('answerResult', { success: true });
-    // Check if all answers are received
-    if (gameLogic.allAnswersReceived()) {
-      gameLogic.advanceGameState();
-      updateAllPlayers(io);
-    }
+    socket.emit(`${username} submitted an answer.`);
   } else {
     socket.emit('error', { message: result.message });
   }
@@ -114,6 +113,18 @@ function handleVote(socket, data, io) {
 }
 
 /**
+ * Handles prompt generation via Socket.IO.
+ */
+function handleGeneratePrompt(socket, data) {
+  const keyword = data.keyword;
+  apiUtils.suggestPrompt(keyword)
+    .then((suggestion) => {
+      socket.emit('promptSuggestion', { suggestion });
+    });
+  // Error checking is handled by apiUtils
+}
+
+/**
  * Handles game advancement via Socket.IO.
  */
 function handleAdvance(socket, data, io) {
@@ -129,35 +140,6 @@ function handleAdvance(socket, data, io) {
     updateAllPlayers(io);
   } else {
     socket.emit('error', { message: result.message });
-  }
-}
-
-/**
- * Handles starting a new game.
- */
-function handleStartGame(socket, data, io) {
-  const username = socket.user;
-
-  if (gameLogic.canStartGame(username)) {
-    gameLogic.startGame();
-    updateAllPlayers(io);
-  } else {
-    socket.emit('error', { message: 'Unable to start the game.' });
-  }
-}
-
-/**
- * Handles joining an existing game.
- */
-function handleJoinGame(socket, data, io) {
-  const username = socket.user;
-  const added = playerManager.addPlayer(username, socket.id);
-
-  if (added) {
-    updatePlayer(socket);
-    updateAllPlayers(io);
-  } else {
-    socket.emit('error', { message: 'Unable to join the game.' });
   }
 }
 
@@ -187,13 +169,12 @@ function handleDisconnect(socket, io) {
 }
 
 module.exports = {
+  gameStart,
+  gameJoin,
   handleChatMessage,
   handleGeneratePrompt,
-  handlePrompt,
-  handleAnswer,
+  handlePromptSubmission,
   handleVote,
   handleAdvance,
-  handleStartGame,
-  handleJoinGame,
   handleDisconnect,
 };

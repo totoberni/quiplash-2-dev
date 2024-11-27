@@ -17,42 +17,60 @@ class GameLogic {
 
     resetGameState() {
         this.gameState = {
-          phase: 'joining',
-          activePrompts: {},// {text, promptUsername} all prompts that can be voted on  
-          submittedPrompts: {}, // {text, promptUsername} all prompts submitted by players
-          answers: {}, // {promptUsername, {answerUsername, answer}}
-          votes: {}, // {answerUsername, voteUsername}
-          roundNumber: 1,
-          totalRounds: 3,
-          updateScores: {},}; // {username, answerScore} May need to update this later
-        }
+            gameCode: this.generateGameCode(),
+            phase: 'joining',
+            activePrompts: {},// [[promptUsername, text]] all prompts that can be voted on  
+            submittedPrompts: [], // [[promptUsername, text]] all prompts submitted by players
+            answers: [], // [[promptUsername, answerUsername, text]]
+            votes: [], // [[answerUsername, voteUsername]]
+            roundNumber: 1,
+            totalRounds: 3,
+            updateScores: [], // [[username, answerScore]] May need to update this later
+        };
+    }
+
     
+    // Create a function that generates a unique game code
+    generateGameCode() {
+        return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
     // Getters
     getGameState() {
         return this.gameState;
     }
 
-    // Helpers
-    addPrompt(text, username) { // Add prompt to submittedPrompts for in-game mgt
-        this.gameState.submittedPrompts.push({"text": text, "username": username});
-        return apiUtils.createPrompt(username, text);
-    }
-
-    calculateAnswerScores(votes) {
+    calculateVoteScores() {
         for (answerUsername in answers) {
-            const answerVotes = votes.filter((vote) => vote === answerUsername).length;
-            const answerScore = answerVotes * this.gameState.roundNumber*100; // Each vote is worth 10 points
+            const answerVotes = this.votes.filter((vote) => vote[0] === answerUsername).length;
+            const answerScore = answerVotes * this.gameState.roundNumber*100;
             this.gameState.updateScores.push({answerUsername, answerScore});
         }
         return updateScores;
     }
 
-    halfPromptsReceived() {
-        return this.gameState.submittedPrompts.length >= playerManager.getPlayers().length/2;
+    async halfPromptsReceived() {
+        let numPlayers = playerManager.getPlayers().length;
+        let needPrompts = numPlayers % 2 === 0 ? numPlayers / 2 : numPlayers
+        return (needPrompts/this.gameState.submittedPrompts >= 0.5);
     }
 
-    gameStateUpdate(io) {
-        io.emit('Next Phase', `gameState: ${getGameState().phase}`);
+    // Updates players and client sockets on the game state 
+    async gameStateUpdate(io) {
+        io.emit(`Round ${this.getGameState.roundNumber}, Phase Change: ${getGameState().phase}`);
+        playerManager.updatePlayersOnGameState(this.gameState.phase);
+    }
+
+    // Fisher-Yates shuffle :)
+    shufflePrompts() { 
+        let prompts = this.gameState.activePrompts;
+        let currentIndex = prompts.length, randomIndex;
+        while (currentIndex !== 0) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [prompts[currentIndex], prompts[randomIndex]] = [prompts[randomIndex], prompts[currentIndex]];
+        }
+        this.gameState.activePrompts = prompts;
     }
 
     // Game State Management. Each method transitions to the next phase and handles the game logic.
@@ -78,19 +96,27 @@ class GameLogic {
     }
 
     // Phase 1: Check if all players are ready to start the game
-    checkAllPlayersReady(io) {setInterval(() => {
+    async checkAllPlayersReady(io) {
+        setInterval(() => {
         if (playerManager.getPlayers().length >= 3) {
             this.gameState.phase = 'prompts';
             this.gameStateUpdate(io);
+            this.advanceGameState(io);
             clearInterval(this); // Stop checking
-        }} , 1000);
+        }return {success: true, message: ''}} , 1000);
         return { success: false, message: 'Waiting for players...' };
     }
 
     // Phase 2: Start prompt collection
     async startPromptCollection(io) {
-        this.gameState.phase = 'prompts';
-        this.gameStateUpdate(io);
+        setInterval(() => {
+            if (halfPromptsReceived()) {
+                this.gameState.phase = 'answers';
+                this.gameStateUpdate(io);
+                this.advanceGameState(io);
+                clearInterval(this);
+            } return {success: true, message: ''}} , 1000);
+        return { success: false, message: 'Waiting for prompts...' };
     }
 
     // Phase 3: Start answer submission
