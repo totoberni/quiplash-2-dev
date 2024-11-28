@@ -19,7 +19,7 @@ class GameLogic {
         this.gameState = {
             gameCode: this.generateGameCode(),
             phase: 'joining',
-            activePrompts: {},// [[promptUsername, text]] all prompts that can be voted on  
+            activePrompts: [],// [[promptUsername, text]] all prompts that can be voted on  
             submittedPrompts: [], // [[promptUsername, text]] all prompts submitted by players
             answers: [], // [[promptUsername, answerUsername, text]]
             votes: [], // [[answerUsername, voteUsername]]
@@ -56,30 +56,95 @@ class GameLogic {
     }
 
     // Updates players and client sockets on the game state 
-    async gameStateUpdate(io) {
+    async gameStateUpdate(io, playerManager) {
         io.emit(`Round ${this.getGameState.roundNumber}, Phase Change: ${getGameState().phase}`);
         playerManager.updatePlayersOnGameState(this.gameState.phase);
     }
 
     // Fisher-Yates shuffle :)
-    shufflePrompts() { 
-        let prompts = this.gameState.activePrompts;
-        let currentIndex = prompts.length, randomIndex;
+    shuffleArray(array) { 
+        let currentIndex = array.length, randomIndex;
         while (currentIndex !== 0) {
             randomIndex = Math.floor(Math.random() * currentIndex);
             currentIndex--;
-            [prompts[currentIndex], prompts[randomIndex]] = [prompts[randomIndex], prompts[currentIndex]];
+            [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
         }
-        this.gameState.activePrompts = prompts;
+        return array;
+    }
+
+    // Check if we have enough prompts, returns bool
+    async enoughPrompts(playerManager) {
+        let numPlayers = playerManager.getPlayers().length;
+        let needPrompts = numPlayers % 2 === 0 ? numPlayers / 2 : numPlayers
+        this.gameState.activePrompts = this.gameState.activePrompts.concat(this.gameState.submittedPrompts); //squishing all submittedPrompts into activePrompts
+        return (this.gameState.activePrompts.length >= needPrompts); // using activePrompts to store prompts from API + submitted prompts
+    }
+
+    async generatePrompts() {
+        // cursed way of getting the number of missing prompts
+        numGeneratedPrompts = (numPlayers % 2 === 0 ? numPlayers / 2 : numPlayers) - this.activePrompts.length;
+        // Iterate over the number of prompts we need to generate
+        for (let i = 0; i < numGeneratedPrompts; i++) {
+            const suggestedPromptResponse = await apiUtils.suggestPrompt('make a random quiplash prompt'); // keyword might need changing
+            const suggestedPromptText = suggestedPromptResponse.suggestion;
+            if (suggestedPromptText !== "Cannot generate suggestion") {
+                // Add the suggested prompt with username 'API'
+                this.gameState.activePrompts.push(['API', suggestedPromptText]);
+                console.log(`Suggested Prompt Added: [API, "${suggestedPromptText}"]`);
+            } else {
+                console.warn('API could not generate a suggestion.');
+                return
+            }
+        }
+    }
+
+    async assignPrompts(io, playerManager) {
+        // Constants
+        const players = playerManager.getPlayers();
+        const numPlayers = players.length;
+        const needPrompts = (numPlayers % 2 === 0) ? numPlayers : numPlayers * 2;
+        // Io just to keep track of the game state
+        io.emit(`Assigning ${needPrompts} prompts to ${numPlayers} players.`);
+        // Fetch prompts until we have enough
+        while (!enoughPrompts(playerManager)) {
+            this.activePrompts.push(playerManager.fetchPrompts('en')); // Fetch prompts needs players list so playerManager does it
+            // Maybe we need more prompts
+            if (this.gameState.activePrompts.length < needPrompts) {
+               this.generatePrompts();
+            }
+        }
+        // Shuffle players and activePrompts
+        const shuffledPlayers = this.shuffleArray([...players]); // Clone to avoid breaking original array
+        const shuffledPrompts = this.shuffleArray([...this.gameState.activePrompts]); 
+
+        // Select the required number of prompts
+        const promptsToAssign = shuffledPrompts.slice(0, needPrompts);
+
+        // Assign prompts to players in a round-robin fashion
+        let playerIndex = 0;
+        for (const prompt of promptsToAssign) {
+            const player = shuffledPlayers[playerIndex % numPlayers];
+            playerManager.assignPromptToPlayer(player, prompt);
+            playerIndex++;
+        }
+        io.emit('Prompts Assigned');
+        // Testing: Log the assignments for verification
+        // console.log('Prompt Assignments:');
+        // players.forEach(player => {
+        //     console.log(`- ${player.username}:`);
+        //     player.assignedPrompts.forEach((prompt, index) => {
+        //         console.log(`  ${index + 1}. [${prompt[0]}, "${prompt[1]}"]`);
+        //     });
+        // });
     }
 
     // Game State Management. Each method transitions to the next phase and handles the game logic.
-    async advanceGameState(io) {
+    async advanceGameState(io, playerManager) {
         switch (this.gameState.phase) {
             case 'joining':
                 return this.checkAllPlayersReady(io);
             case 'prompts':
-                return await this.startPromptCollection(io);
+                return await this.startPromptCollection(io, playerManager);
             case 'answers':
                 return this.startAnswerSubmission(io);
             case 'voting':
@@ -96,27 +161,30 @@ class GameLogic {
     }
 
     // Phase 1: Check if all players are ready to start the game
-    async checkAllPlayersReady(io) {
+    async checkAllPlayersReady(io, playerManager) {
         setInterval(() => {
-        if (playerManager.getPlayers().length >= 3) {
-            this.gameState.phase = 'prompts';
-            this.gameStateUpdate(io);
-            this.advanceGameState(io);
-            clearInterval(this); // Stop checking
-        }return {success: true, message: ''}} , 1000);
-        return { success: false, message: 'Waiting for players...' };
+            if (playerManager.getPlayers().length >= 3) {
+                this.gameState.phase = 'prompts';
+                this.gameStateUpdate(io);
+                this.advanceGameState(io);
+                clearInterval(this); // Stop checking
+                return {success: true, message: ''};
+            } else {return { success: false, message: 'Waiting for players...' };}
+        } , 1000);   
     }
 
     // Phase 2: Start prompt collection
-    async startPromptCollection(io) {
+    async startPromptCollection(io, playerManager) {
         setInterval(() => {
             if (halfPromptsReceived()) {
+                this.assignPrompts(playerManager);
                 this.gameState.phase = 'answers';
                 this.gameStateUpdate(io);
                 this.advanceGameState(io);
                 clearInterval(this);
-            } return {success: true, message: ''}} , 1000);
-        return { success: false, message: 'Waiting for prompts...' };
+                return {success: true, message: ''}
+            } else {return { success: false, message: 'Waiting for prompts...' }}
+        } , 1000);
     }
 
     // Phase 3: Start answer submission

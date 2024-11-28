@@ -40,6 +40,17 @@ class PlayerManager {
         return this.getAudience().find((p) => p.username === audience.username);
     }
 
+    // Fetch Prompts returns all prompts submitted in previous games by the player
+    async fetcPrompts(language){
+        const allUsernames = getPlayers().concat(getAudience()).map((p) => p.username); // Get all usernames for API call
+        const response = await apiUtils.getPrompts(allUsernames, language); 
+        if (response.prompts) {
+            // convert [{id, username, texr}] to [[username, text]]
+            const apiPrompts = response.prompts.map(({username, text }) => [username, text]);
+            return apiPrompts;
+        } else {return [];} // Error handng is done in apiUtils. Might want t edit this
+    }
+
     // Helpers
     isPlayer(player) {
         return this.getPlayer(player) !== (undefined||null||''); 
@@ -114,6 +125,7 @@ class PlayerManager {
     updatePlayersAfterGame(player) {
         for (player in getPlayers()) {
             player.gamesPlayed += 1;
+            player.score += player.roundScore;
             player.roundScore = 0;
             player.assignedPrompts = [];
             player.submittedPrompts = [];
@@ -122,6 +134,17 @@ class PlayerManager {
             player.state = 'waiting';
             player.justJoined = false;
             }
+    }
+    updateClientBeforeLogout(client) {
+        client.score += client.roundScore;
+        apiUtils.editPlayer(client.username, client.gamesPlayed, client.score);
+        client.roundScore = 0;
+        client.assignedPrompts = [];
+        client.submittedPrompts = [];
+        client.answer = [];
+        client.vote = [];
+        client.state = 'offline';
+        client.justJoined = false;
     }
     
     // Remove clients
@@ -150,7 +173,8 @@ class PlayerManager {
         else { // Username not found
             console.log('Error removing user.'); 
             return false;
-        } 
+        }
+        updatePlayerBeforeLogout(player); // Should run after all validation is done
     }
     removeUserBySocketId(socketId) {
         const client = this.getPlayers().concat(this.getAudience()).find((player) => player.socketId === socketId);
@@ -175,7 +199,6 @@ class PlayerManager {
       gameState.submittedPrompts.push([player.username, text]);
       return { success: true };
     }
-
     // Handle answer submission by a player
     // Takes prompt -> [promptUsername, text] and pushes answer -> [promptUsername, answerUsername, text] to gameState.answers and player.answers
     submitAnswer(gameState, player, text, prompt) {
@@ -195,7 +218,6 @@ class PlayerManager {
             player.state = 'submitted'; // Helps check if all answers have been submitted
         }
     }
-
     // Handle vote submission by a player
     // Takes answer -> [promptUsername, answerUsername, text] and pushes vote -> [answerUsername, voteUsername] to gameState.votes and player.vote
     submitVote(gameState, player, answer) {
@@ -209,6 +231,13 @@ class PlayerManager {
         gameState.votes.push([answer[1], player.username]);
         player.vote.push([answer[1], player.username]); // [answerUsername, voteUsername]
         player.state = 'submitted'; 
+    }
+    // Assigning prompts to players used in gameLogic.js
+    assignPromptToPlayer(player, prompt) {
+        if (!player || player.justJoined || player.state !== 'active') {
+            return { success: false, message: 'Player cannot be assigned prompts.' };
+        }
+        player.assignedPrompts.push(prompt);
     }
 }        
 
