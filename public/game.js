@@ -87,7 +87,7 @@ var app = new Vue({
         gameCreate() {
             if (socket) {
                 socket.emit('gameCreate');
-                inGame = true;
+                this.inGame = true; // Use 'this' to refer to data properties
             } else {
                 this.errorMsg = 'Not connected to the server.';
             }
