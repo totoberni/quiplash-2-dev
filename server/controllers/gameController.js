@@ -2,21 +2,25 @@
 
 'use strict';
 
-const playerManager = require('../utils/playerManager');
-const gameLogic = require('../utils/gameLogic');
+const PlayerManager = require('../utils/playerManager');
+const GameLogic = require('../utils/gameLogic');
 const apiUtils = require('../utils/apiUtils');
-const { use } = require('./authController');
-const activeGames  = [];
+//const { use } = require('./authController');
+const activeGames  = []; // [gameLogic, playerManager]
 
 // Starting a new Game
-function gameStart(socket) {
+function gameCreate(socket, io) {
   const username = socket.user;
   if (username) {
-    activeGames.push([gameLogic(), playerManager()]); // add new gameLogic and playerManager objects to activeGames
-    playerManager.addPlayer(username, socket.id);
-    io.emit('message', { message: `${username} has created a game.` });
+    const gameLogic = new GameLogic ()
+    const playerManager = new PlayerManager();
+    activeGames.push([gameLogic, playerManager]); 
+    playerManager.addPlayer(username, socket.id, gameLogic.gameState.phase);
+    socket.join(gameLogic.gameState.gameCode);
+    socket.emit('gameCreated', { gameCode: gameLogic.gameState.gameCode });
+    console.log(`Game created by ${username} with code ${gameLogic.gameState.gameCode}`);
   } else {
-    socket.emit('error', { message: 'Unable to start the game. User is invalid' });
+    Socket.emit('error', { message: 'Unable to start the game. User is invalid' });
   }
 }
 
@@ -25,9 +29,11 @@ function gameJoin(socket, gameCode) {
   const username = socket.user;
   const game = gameSearch(socket, gameCode);
   if (game) {
-    const playerManager = game[1]; // get playerManager object from game
-    playerManager.addPlayer(username, socket.id);
-    io.emit('message', { message: `${username} has connected to the game.` });
+    const playerManager = game[1];
+    playerManager.addPlayer(username, socket.id, game[0].gameState.phase); // Pass the current game phase
+    socket.emit('message', { message: `${username} has connected to the game.` });
+  } else {
+    socket.emit('error', { message: 'Game code not found! Try again' });
   }
 }
 
@@ -79,7 +85,8 @@ function handlePromptSubmission(socket, data, io) {
 // Disconnects the user from the game.
 function handleDisconnect(socket, io) {
   const username = socket.user;
-  const player = playerManager.getPlayerBySocketId(socket.id);
+  const game = findGameBySocketId(socket.id);
+  const player = game[1].getPlayerBySocketId(socket.id);
   if (player) {
     playerManager.removeUserBySocketId(socket.id); // handles updating user stats in playerManager
     updateAllPlayers(io);
@@ -88,7 +95,7 @@ function handleDisconnect(socket, io) {
 }
 
 module.exports = {
-  gameStart,
+  gameCreate,
   gameJoin,
   handleChatMessage,
   handlePromptSubmission,

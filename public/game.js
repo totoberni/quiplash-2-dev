@@ -8,15 +8,18 @@ var app = new Vue({
     data: {
         connected: false,
         loggedIn: false,
+        inGame: false,
         username: '',
         password: '',
-        sessionId: '',      // Store the session ID
+        sessionId: '',
         messages: [],
         chatmessage: '',
         errorMsg: '',
         successMsg: '',
-        gameState: null,    // Game state sent from the server
-        playerState: null   // Player-specific state sent from the server
+        gameState: null,
+        playerInfo: null,
+        showJoinGameForm: false,  // To control the visibility of the join game form
+        gameCode: ''              // To store the entered game code
     },
     methods: {
         handleChat(data) {
@@ -81,16 +84,22 @@ var app = new Vue({
                 this.errorMsg = 'An error occurred during login.';
             });
         },
-        startGame() {
+        gameCreate() {
             if (socket) {
-                socket.emit('startGame');
+                socket.emit('gameCreate');
+                inGame = true;
             } else {
                 this.errorMsg = 'Not connected to the server.';
             }
         },
-        joinGame() {
+        showJoinGame() {
+            this.showJoinGameForm = true;
+        },
+        submitGameCode() {
             if (socket) {
-                socket.emit('joinGame');
+                socket.emit('gameJoin', { gameCode: this.gameCode });
+                this.inGame = true;
+                this.showJoinGameForm = false;
             } else {
                 this.errorMsg = 'Not connected to the server.';
             }
@@ -112,10 +121,18 @@ function connect(sessionId) {
         app.connected = true;
     });
 
-    // Handle connection error
-    socket.on('connect_error', function(error) {
-        console.error('Connection error:', error.message);
-        alert('Unable to connect: ' + error.message);
+    // Handle game created event
+    socket.on('gameCreated', function(data) {
+        app.inGame = true;
+        app.gameCode = data.gameCode; // Store the game code
+        app.successMsg = `Game created with code: ${data.gameCode}`;
+    });
+
+    // Handle game joined event
+    socket.on('gameJoined', function(data) {
+        app.inGame = true;
+        app.gameCode = data.gameCode; // Store the game code
+        app.successMsg = `Joined game with code: ${data.gameCode}`;
     });
 
     // Handle disconnection
@@ -127,15 +144,6 @@ function connect(sessionId) {
     // Handle incoming chat message
     socket.on('chat', function(data) {
         app.handleChat(data);
-    });
-
-    // Handle game state updates from the server
-    socket.on('gameStateUpdate', function(data) {
-        app.gameState = data.gameState;
-        app.playerState = data.playerState;
-        app.errorMsg = '';
-        app.successMsg = '';
-        // Update the UI based on the new state
     });
 
     // Handle errors from the server

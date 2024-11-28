@@ -19,25 +19,34 @@
                     <p v-if="errorMsg" class="alert alert-danger">{{ errorMsg }}</p>
                 </div>
 
-                <!-- Game Controls -->
-                <div class="game-controls mb-3">
-                    <div v-if="!gameState || gameState.phase === 'joining'">
-                        <div v-if="playerState && playerState.isAdmin">
-                            <button @click="startGame" class="btn btn-primary">Start Game</button>
-                            <p>You are the game administrator.</p>
-                        </div>
-                        <div v-else>
-                            <p>Waiting for the game to start...</p>
+                <!-- Conditional Screens -->
+                <div v-if="!inGame">
+                    <!-- Welcome Screen -->
+                    <div class="welcome-screen mb-3">
+                        <button @click="gameCreate" class="btn btn-primary">Create Game</button>
+                        <button @click="showJoinGame" class="btn btn-secondary">Join Game</button>
+                    </div>
+
+                    <!-- Join Game Form -->
+                    <div v-if="showJoinGameForm" class="join-game-form mt-3">
+                        <div class="input-group">
+                            <input type="text" v-model="gameCode" placeholder="Enter Game Code" class="form-control" @keyup.enter="submitGameCode">
+                            <button @click="submitGameCode" class="btn btn-primary">Submit</button>
                         </div>
                     </div>
-                    <!-- Other game phases -->
-                    <!-- ... -->
                 </div>
 
-                <!-- Chat Section -->
-                <div id="chat-section" class="mt-4">
-                    <h4>Chat Room</h4>
-                    <%- include('chat'); -%>
+                <!-- Lobby Screen -->
+                <div v-else>
+                    <div class="lobby-screen mb-3">
+                        <h3>Game Lobby</h3>
+                        <p>Waiting for Players to Join</p>
+                        <!-- Chat Section -->
+                        <div id="chat-section" class="mt-4">
+                            <h4>Game Chat</h4>
+                            <%- include('chat'); -%>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div v-else>

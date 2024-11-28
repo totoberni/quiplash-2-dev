@@ -2,16 +2,15 @@
 // Handles logic for players and their actions during the game. Shares responsibility with gameLogic.js.
 'use strict';
 
-const gameLogic = require('./gameLogic');
 const apiUtils = require('./apiUtils');
 const Player = require('../models/playerModel');
-const { get } = require('../controllers/authController');
 
 class PlayerManager {
+
   constructor() {
-    this.players = {}; // Active players
+    this.players = []; // Active players
     this.admin = null; // Game admin player object
-    this.audience = {}; // Audience members
+    this.audience = []; // Audience members
   }
 
     // Getters 
@@ -20,6 +19,9 @@ class PlayerManager {
     }
     getPlayer(player) {
         return this.getPlayers().find((p) => p.username === player.username); // Maybe need to change this
+    }
+    getPlayerByUsername(username) {
+        return this.getPlayers().find((p) => p.username === username);
     }
     getPlayerBySocketId(socketId) {
         let player =  this.getPlayers().find((player) => player.socketId === socketId);
@@ -53,10 +55,10 @@ class PlayerManager {
 
     // Helpers
     isPlayer(player) {
-        return this.getPlayer(player) !== (undefined||null||''); 
-    }
+        return !!this.getPlayer(player); // Returns true if player exists
+      }
     isAudience(audience) {
-        return this.getAudienceMember(audience) !== (undefined||null||'');
+        return !!this.getAudienceMember(audience);
     }    
     isAdmin(player) {
         return this.getAdmin().username === player.username; // May need to check without username boh
@@ -67,18 +69,19 @@ class PlayerManager {
     }
 
     // Add new clients
-    addPlayer(player, socketId, gameStatePhase) {
-      if (this.isPlayer(player.username)|| this.isAudience(player.username)) {
-        return false; // Username already taken
-      }
-      if (this.getPlayers().length === 8) {
-          this.addAudience(username, socketId);
-          return false; // Room is full
-      }
-      const isAdmin = getPlayers() == 0 || null|| undefined; // First player is admin
-      const justJoined = gameStatePhase !== joining;
-      this.players.push(new Player(socketId, username, isAdmin, justJoined)); // justJoined is true if player joins during a game
-      return true;
+    addPlayer(username, socketId, gameStatePhase) {
+        const player = this.getPlayerByUsername(username);
+        if (player) {
+          return false; // Username already taken
+        }
+        if (this.getPlayers().length === 8) {
+            this.addAudience(username, socketId);
+            return false; // Room is full
+        }
+        const isAdmin = this.getPlayers() == 0 || null|| undefined; // First player is admin
+        const justJoined = gameStatePhase !== 'joining';
+        this.players.push(new Player(socketId, username, isAdmin, justJoined)); // justJoined is true if player joins during a game
+        return true;
     }
     addAudience(player, socketId) {
       this.audience.push(new Player(socketId, player.username, false));
@@ -93,6 +96,7 @@ class PlayerManager {
                 break;
             case 'prompts':
                 getPlayers().concat(getAudience()).forEach((player) => player.state = 'active');
+                this.getPlayers().forEach((player) => player.justJoined = false); // Enable them to play starting from this round
                 break;
             case 'answers':
                 getAudience().forEach((player) => player.state = 'waiting');
@@ -241,4 +245,18 @@ class PlayerManager {
     }
 }        
 
-module.exports = new PlayerManager();
+function addPlayer(player, socketId, gameStatePhase) {
+    if (this.isPlayer(player.username)|| this.isAudience(player.username)) {
+      return false; // Username already taken
+    }
+    if (this.getPlayers().length === 8) {
+        this.addAudience(username, socketId);
+        return false; // Room is full
+    }
+    const isAdmin = getPlayers() == 0 || null|| undefined; // First player is admin
+    const justJoined = gameStatePhase !== joining;
+    this.players.push(new Player(socketId, username, isAdmin, justJoined)); // justJoined is true if player joins during a game
+    return true;
+  }
+
+module.exports = PlayerManager;

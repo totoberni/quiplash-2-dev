@@ -32,6 +32,16 @@ module.exports.initializeSocket = (io) => {
       gameController.handleChatMessage(socket, data, io);
     });
 
+    // Handle game start
+    socket.on('gameCreate', () => {
+      gameController.gameCreate(socket, io);
+    });
+
+    // Handle game join
+    socket.on('gameJoin', (data) => {
+      gameController.gameJoin(socket, data, io);
+    });
+
     // Handle prompt submission
     socket.on('prompt', (data) => {
       gameController.handlePrompt(socket, data, io);
