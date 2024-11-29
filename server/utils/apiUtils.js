@@ -87,20 +87,44 @@ module.exports = {
     }
   },
 
-  // Edit Player
+  // Edit Player TODO: streamline the code.
   async editPlayer(username, add_to_games_played, add_to_score) {
-    console.log('API: editPlayer called with:', { username, data });
+    console.log('API: editPlayer called with:', { username, add_to_games_played, add_to_score });
     try {
-      const response = await axios.post(`${BACKEND_ENDPOINT}player/update`, {
+      const response = await axios.put(`${BACKEND_ENDPOINT}player/update`, {
         username,
         add_to_games_played,
         add_to_score
       });
+
       console.log('Backend API response:', response.data);
-      return response.data; // Expected response indicating update status
+
+      // Check for response status code 200
+      if (response.status !== 200) {
+        console.error(`API editPlayer Error: Received status code ${response.status}`);
+        throw new Error(`API editPlayer Error: Received status code ${response.status}`);
+      }
+      // Check if response indicates success
+      if (!response.data.result) {
+        console.error(`API editPlayer Error: ${response.data.msg}`);
+        throw new Error(`API editPlayer Error: ${response.data.msg}`);
+      }
+      // Success
+      return response.data;
     } catch (error) {
-      console.error('API editPlayer Error:', error.message);
-      throw error;
+      if (error.response) {
+        // The request was made, and the server responded with a status code outside of 2xx
+        console.error(`API editPlayer Error: ${error.response.status} - ${error.response.data.msg || error.response.statusText}`);
+        throw new Error(`API editPlayer Error: ${error.response.status} - ${error.response.data.msg || error.response.statusText}`);
+      } else if (error.request) {
+        // The request was made, but no response was received
+        console.error('API editPlayer Error: No response received from server');
+        throw new Error('API editPlayer Error: No response received from server');
+      } else {
+        // Something else happened
+        console.error(`API editPlayer Error: ${error.message}`);
+        throw error;
+      }
     }
   },
 
