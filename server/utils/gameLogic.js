@@ -24,7 +24,8 @@ class GameLogic extends EventEmitter {
             votes: [], // [[answerUsername, voteUsername]]
             roundNumber: 1,
             totalRounds: 3,
-            updateScores: [], // [[] answerUsername, answerScore ]]
+            results : [], // [[ answerUsername, answerText, votes]]
+            updateScores: [], // [[ answerUsername, answerScore ]]
             numPlayers: 0, // Added to keep track of the number of players
         };
     }
@@ -34,14 +35,88 @@ class GameLogic extends EventEmitter {
         return this.gameState;
     }
 
+    calculateResults() {
+        const voteCounts = {}; // { answerUsername: votes }
+    
+        // Count votes per answerUsername
+        for (const vote of this.gameState.votes) {
+            const [answerUsername, voteUsername] = vote;
+            if (!voteCounts[answerUsername]) {
+                voteCounts[answerUsername] = 0;
+            }
+            voteCounts[answerUsername]++;
+        }
+    
+        // Build results array
+        const results = [];
+        const addedAnswerUsernames = new Set();
+    
+        for (const answer of this.gameState.answers) {
+            const [promptUsername, answerUsername, answerText] = answer;
+    
+            // Ensure each answerUsername is unique
+            if (!addedAnswerUsernames.has(answerUsername)) {
+                const votes = voteCounts[answerUsername] || 0;
+    
+                // Only include answers with votes > 0
+                if (votes > 0) {
+                    results.push([answerUsername, answerText, votes]);
+                    addedAnswerUsernames.add(answerUsername);
+                }
+            }
+        }
+        // Sort results in descending order of votes
+        results.sort((a, b) => b[2] - a[2]); // Sort by votes descending
+    
+        return results; // [[ answerUsername, answerText, votes]] descending order by votes
+    }
+
     calculateVoteScores() {
+        const playerScores = {}; // { answerUsername: totalScore }
+        // Calculate scores for each player
         for (let answer of this.gameState.answers) {
             const answerUsername = answer[1];
             const answerVotes = this.gameState.votes.filter((vote) => vote[0] === answerUsername).length;
             const answerScore = answerVotes * this.gameState.roundNumber * 100;
-            this.gameState.updateScores.push({ answerUsername, answerScore });
+    
+            if (!playerScores[answerUsername]) {
+                playerScores[answerUsername] = 0;
+            }
+            playerScores[answerUsername] += answerScore;
         }
-        return this.gameState.updateScores;
+        // Convert playerScores object to array
+        const scoresArray = Object.keys(playerScores).map(username => {
+            return [username, playerScores[username]];
+        });
+        // Sort the array
+        scoresArray.sort((a, b) => {
+            if (b[1] !== a[1]) {
+                // Sort by score descending
+                return b[1] - a[1];
+            } else {
+                // If scores are equal, sort alphabetically
+                return a[0].localeCompare(b[0]);
+            }
+        });
+        // Build the podium (top 5 positions)
+        const podium = [];
+        let position = 1;
+        let i = 0;
+        while (position <= 5 && i < scoresArray.length) {
+            const currentScore = scoresArray[i][1];
+            const playersAtPosition = [];
+    
+            while (i < scoresArray.length && scoresArray[i][1] === currentScore) {
+                playersAtPosition.push([scoresArray[i][0], scoresArray[i][1]]);
+                i++;
+            }
+            podium.push({
+                position: position,
+                players: playersAtPosition
+            });
+            position++;
+        }
+        return podium;
     }
 
     async halfPromptsReceived(playerManager) {
@@ -158,6 +233,8 @@ class GameLogic extends EventEmitter {
             case 'results':
                 return this.showResults(io, playerManager);
             case 'scores':
+                return this.showScores(io, playerManager);
+            case 'nextRound':
                 return this.nextRoundOrEndGame(io, playerManager);
             case 'endGame':
                 return this.endGame(io, playerManager);
@@ -175,8 +252,8 @@ class GameLogic extends EventEmitter {
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
             } else {
-                elapsedSeconds += 1;
-                if (elapsedSeconds % 10 === 0) {
+                this.elapsedSeconds += 1;
+                if (this.elapsedSeconds % 10 === 0) {
                     io.emit('message', { message: 'Waiting for more players...' });
                     console.log('Waiting for players...');
                 }
@@ -197,8 +274,8 @@ class GameLogic extends EventEmitter {
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
             } else {
-                elapsedSeconds += 1;
-                if (elapsedSeconds % 10 === 0) {
+                this.elapsedSeconds += 1;
+                if (this.elapsedSeconds % 10 === 0) {
                     console.log('Waiting for prompts...');
                     io.emit('message', { message: 'Waiting for prompts...' });
                 }
@@ -220,8 +297,8 @@ class GameLogic extends EventEmitter {
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
             } else {
-                elapsedSeconds += 1;
-                if (elapsedSeconds % 10 === 0) {
+                this.elapsedSeconds += 1;
+                if (this.elapsedSeconds % 10 === 0) {
                     console.log('Waiting for answers...');
                     io.emit('message', { message: 'Waiting for answers...' });
                 }
@@ -237,8 +314,8 @@ class GameLogic extends EventEmitter {
         this.gameStateUpdate(io, playerManager);
 
         // Emit voting options
-        this.prepareVotingOptions(io, playerManager);
-
+        this.prepareVotingOptions();
+        this.gameStateUpdate(io, playerManager);
         let elapsedSeconds = 0;
 
         const intervalId = setInterval(async () => {
@@ -248,8 +325,8 @@ class GameLogic extends EventEmitter {
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
             } else {
-                elapsedSeconds += 1;
-                if (elapsedSeconds % 10 === 0) {
+                this.elapsedSeconds += 1;
+                if (this.elapsedSeconds % 10 === 0) {
                     console.log('Waiting for players to vote...');
                     io.emit('message', { message: 'Waiting for players to vote...' });
                 }
@@ -260,56 +337,50 @@ class GameLogic extends EventEmitter {
     }
 
     // Helper method to prepare voting options
-    prepareVotingOptions(io) {
-        // Assuming you need to structure the voting options in a specific way
-        // For example, group answers by prompt
+    prepareVotingOptions() {
         const votingOptions = [];
-
-        const promptsMap = new Map(); // Map prompt text to array of answers
 
         for (const answer of this.gameState.answers) {
             const [promptUsername, answerUsername, answerText] = answer;
-            const promptText = this.gameState.activePrompts.find(p => p[0] === promptUsername)[1];
+            const promptEntry = this.gameState.activePrompts.find(p => p[0] === promptUsername);
+            const promptText = promptEntry ? promptEntry[1] : 'Unknown Prompt';
 
-            if (!promptsMap.has(promptText)) {
-                promptsMap.set(promptText, []);
-            }
-            promptsMap.get(promptText).push({
-                answerUsername,
-                answerText
-            });
-        }
-
-        // Convert map to array
-        for (const [promptText, options] of promptsMap.entries()) {
-            votingOptions.push({
-                promptText,
-                options
-            });
+            votingOptions.push([answerUsername, promptText, answerText]);
         }
 
         this.gameState.votingOptions = votingOptions;
-        io.emit('gameStateUpdate', { gameState: this.getGameState() });
     }
 
     // Phase 5: Show results
     async showResults(io, playerManager) {
         this.gameState.phase = 'results';
         this.gameStateUpdate(io, playerManager);
-
-        // Calculate and emit results
-        const results = this.calculateVoteScores();
-        this.gameState.results = results;
+    
+        // Calculate and set results
+        this.gameState.results = this.calculateResults();
         io.emit('gameStateUpdate', { gameState: this.getGameState() });
-
+    
         setTimeout(() => {
             this.gameState.phase = 'scores';
             this.gameStateUpdate(io, playerManager);
             this.advanceGameState(io, playerManager);
-        }, 10000); // Adjust the timeout as needed
+        }, 20000); // Adjust the timeout as needed
     }
 
-    // Phase 6: Next round or end game
+    // Phase 6: Show scores
+    async showScores(io, playerManager) {
+        this.gameState.phase = 'scores';
+        this.gameState.updateScores = this.calculateVoteScores();
+        this.gameStateUpdate(io, playerManager);
+    
+        setTimeout(() => {
+            this.gameState.phase = 'nextRound';
+            this.gameStateUpdate(io, playerManager);
+            this.advanceGameState(io, playerManager);
+        }, 20000); // Adjust the timeout as needed
+    }
+
+    // Phase 7: Next round or end game
     async nextRoundOrEndGame(io, playerManager) {
         if (this.gameState.roundNumber < this.gameState.totalRounds) {
             this.gameState.roundNumber += 1;

@@ -88,8 +88,7 @@ for browser in browsers[1:]:
     submit_button.click()
 
 # Wait for all browsers to reach the prompt submission phase
-# You may need to adjust the sleep time based on your application's timing
-time.sleep(5)
+time.sleep(5)  # Adjust the sleep time based on your application's timing
 
 # Now, all users submit the prompt 'what is your favourite color of the week'
 prompt_text = 'what is your favourite color of the week'
@@ -106,7 +105,75 @@ for browser in browsers:
     except Exception as e:
         print(f'Error submitting prompt in one of the browsers: {e}')
 
-# Optionally, you can close the browsers after testing
-# time.sleep(10)  # Wait for a while to observe the results
-# for browser in browsers:
-#     browser.quit()
+# Wait for the game to progress to the 'Submit Your Answers' phase
+time.sleep(10)  # Adjust the sleep time based on your application's timing
+
+# Now, each user submits the answer 'wednesday is my favourite color of the week'
+answer_text = 'wednesday is my favourite color of the week'
+
+for browser in browsers:
+    wait = WebDriverWait(browser, wait_times['long'])
+    try:
+        # Wait for the 'Submit Your Answers' heading to appear
+        wait.until(EC.presence_of_element_located((By.XPATH, '//h3[contains(text(), "Submit Your Answers")]')))
+
+        # Find all answer input fields
+        answer_inputs = browser.find_elements(By.CSS_SELECTOR, 'input[placeholder="Your answer"]')
+        # Submit the answer in each input field
+        for answer_input in answer_inputs:
+            answer_input.send_keys(answer_text)
+        # Click the Submit Answers button
+        submit_answers_button = browser.find_element(By.XPATH, '//button[text()="Submit Answers"]')
+        submit_answers_button.click()
+    except Exception as e:
+        print(f'Error submitting answers in one of the browsers: {e}')
+
+# Wait for the game to progress to the voting phase
+time.sleep(10)  # Adjust the sleep time based on your application's timing
+
+# Now, simulate voting
+# We want two browsers to vote for option 1, and one browser to vote for option 2
+
+# Define the voting choices for each browser
+# Browsers 0 and 1 will vote for option 1
+# Browser 2 will vote for option 2
+voting_choices = [1, 1, 2]
+
+for idx, browser in enumerate(browsers):
+    wait = WebDriverWait(browser, wait_times['long'])
+    try:
+        # Wait for the 'Vote for the Best Answer' heading to appear
+        wait.until(EC.presence_of_element_located((By.XPATH, '//h3[contains(text(), "Vote for the Best Answer")]')))
+
+        # Wait for voting options to be present
+        voting_options = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.proportional-box.voting-option')))
+
+        # Select the voting choice
+        choice_index = voting_choices[idx] - 1  # Adjust for zero-based index
+        if choice_index < len(voting_options):
+            voting_option = voting_options[choice_index]
+            browser.execute_script("arguments[0].scrollIntoView();", voting_option)
+            voting_option.click()
+
+            # Wait for the 'Submit Vote' button to appear
+            submit_vote_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Submit Vote"]')))
+            submit_vote_button.click()
+            print(f"Browser {idx + 1} voted for option {voting_choices[idx]}")
+        else:
+            print(f"Browser {idx + 1}: Voting option {voting_choices[idx]} not found")
+    except Exception as e:
+        print(f'Error during voting in browser {idx + 1}: {e}')
+
+# At this point, the browsers should not be closed so you can inspect the results
+print("Votes submitted. Browsers remain open for inspection.")
+
+# Optional: Keep the browsers open indefinitely or for a set amount of time
+# Uncomment the line below to keep browsers open indefinitely
+input("Press Enter to close the browsers...")
+
+# Or keep browsers open for a specific duration
+# time.sleep(300)  # Keep browsers open for 5 minutes
+
+# If you decide to close the browsers after inspection
+for browser in browsers:
+    browser.quit()

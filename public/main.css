@@ -1,30 +1,200 @@
+/* main.css */
+
+/* Existing styles */
 body {
     background-image: url('/static/background.jpg');
     background-size: cover;
     background-repeat: no-repeat;
     background-color: #acc5d0;
 }
+
 .title {
     font-weight: bold;
     font-size: 32px;
     text-align: center;
 }
+
 .container {
-    background-color: rgba(255,255,255,0.8);
+    background-color: rgba(255, 255, 255, 0.8);
     padding-bottom: 10px;
     padding-top: 10px;
     height: 100vh;
+    overflow-y: auto; /* Allows scrolling if content overflows */
 }
+
 #chat { 
     list-style-type: none; 
     margin: 0; 
     padding: 0; 
-    overflow: auto;
+    overflow-y: auto;
     max-height: 80vh;
 }
+
 #chat li { 
     padding: 5px 10px; 
 }
+
 #chat li:nth-child(odd) { 
-    background-color: rgba(0,0,0,0.2); 
+    background-color: rgba(0, 0, 0, 0.2); 
+}
+
+/* Proportional Container */
+.proportional-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+/* Proportional Box */
+.proportional-box {
+    border: 1px solid #ccc;
+    padding: 15px;
+    margin: 10px;
+    flex: 1 1 calc(25% - 40px); /* Adjusts size based on number of boxes */
+    max-width: calc(25% - 40px);
+    text-align: center;
+    background-color: #f9f9f9;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Hover effect for voting options */
+.voting-option:hover {
+    background-color: #e9ecef;
+}
+
+/* Selected voting option */
+.voting-option.selected {
+    border-color: #007bff;
+    background-color: #e0f0ff;
+}
+
+/* Shared styles for p tags inside proportional boxes */
+.proportional-box p {
+    margin: 0;
+    padding: 5px 0;
+    word-wrap: break-word;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+    .proportional-box {
+        flex: 1 1 calc(33.333% - 40px);
+        max-width: calc(33.333% - 40px);
+    }
+}
+
+@media (max-width: 768px) {
+    .proportional-box {
+        flex: 1 1 calc(50% - 40px);
+        max-width: calc(50% - 40px);
+    }
+}
+
+@media (max-width: 576px) {
+    .proportional-box {
+        flex: 1 1 calc(100% - 40px);
+        max-width: calc(100% - 40px);
+    }
+}
+
+/* New styles for the podium */
+
+/* Podium Container */
+.podium-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-top: 20px;
+}
+
+/* Podium Box */
+.podium-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 10px;
+    padding: 15px;
+    width: 220px; /* Adjust as needed */
+    border: 2px solid #ccc;
+    background-color: #f9f9f9;
+    box-sizing: border-box;
+}
+
+/* Gold, Silver, and Bronze borders */
+.podium-box.gold {
+    border-color: gold;
+}
+
+.podium-box.silver {
+    border-color: silver;
+}
+
+.podium-box.bronze {
+    border-color: #cd7f32; /* Bronze color */
+}
+
+/* Standard border for other positions */
+.podium-box.standard {
+    border-color: #ccc;
+}
+
+/* Podium Position Label */
+.podium-position {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+/* Podium Player Entry */
+.podium-player {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-between;
+    margin: 5px 0;
+}
+
+/* Player Name and Score */
+.podium-player-name {
+    width: 50%;
+    text-align: left;
+    font-weight: bold;
+}
+
+.podium-player-score {
+    width: 50%;
+    text-align: right;
+    font-weight: bold;
+}
+
+/* Optional: Adjust text color for better visibility */
+.podium-box.gold .podium-player-name,
+.podium-box.gold .podium-player-score {
+    color: #b8860b; /* Dark gold color */
+}
+
+.podium-box.silver .podium-player-name,
+.podium-box.silver .podium-player-score {
+    color: #6c757d; /* Gray color */
+}
+
+.podium-box.bronze .podium-player-name,
+.podium-box.bronze .podium-player-score {
+    color: #8b5a2b; /* Dark bronze color */
+}
+
+/* Responsive adjustments for podium boxes */
+@media (max-width: 768px) {
+    .podium-box {
+        width: 180px;
+    }
+}
+
+@media (max-width: 576px) {
+    .podium-box {
+        width: 100%;
+    }
 }

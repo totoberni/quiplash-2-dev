@@ -43,33 +43,65 @@
                             </div>
 
                             <!-- 3. Voting -->
-                            <div v-else-if="playerInfo.state === 'active' && gameState.phase === 'voting'">
+                            <div v-else-if="gameState.phase === 'voting' && playerInfo.state === 'active'">
                                 <h3>Vote for the Best Answer</h3>
-                                <div v-for="(answer, index) in gameState.votes" :key="index" class="mb-3">
-                                    <p><strong>Prompt:</strong> {{ answer.promptText }}</p>
-                                    <div v-for="(option, optIndex) in answer.options" :key="optIndex">
-                                        <button @click="submitVote(option)" class="btn btn-secondary mb-2">{{ option.answerText }}</button>
+                                <div class="proportional-container">
+                                    <div
+                                        v-for="(option, index) in gameState.votingOptions"
+                                        :key="index"
+                                        class="proportional-box voting-option"
+                                        :class="{ selected: selectedOptionIndex === index }"
+                                        @click="selectOption(index)"
+                                    >
+                                        <p><strong>Answer by:</strong> {{ option[0] }}</p>
+                                        <p><strong>Prompt:</strong> {{ option[1] }}</p>
+                                        <p><strong>Answer:</strong> {{ option[2] }}</p>
+                                    </div>
+                                </div>
+                                <button v-if="selectedOptionIndex !== null" @click="submitVote" class="btn btn-primary mt-3">Submit Vote</button>
+                            </div>
+
+                            <!-- 4. Results -->
+                            <div v-else-if="gameState.phase === 'results' && playerInfo.state === 'waitingResults'">
+                                <h3>Results</h3>
+                                <div class="proportional-container">
+                                    <div
+                                        v-for="(result, index) in gameState.results.slice(0,14)"
+                                        :key="index"
+                                        class="proportional-box"
+                                    >
+                                        <p><strong>{{ result[0] }}</strong></p> <!-- answerUsername -->
+                                        <p>{{ result[1] }}</p> <!-- answerText -->
+                                        <p><strong>Votes: {{ result[2] }}</strong></p> <!-- Votes -->
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- 4. Results -->
-                            <div v-else-if="playerInfo.state === 'waitingResults'">
-                                <h3>Results</h3>
-                                <div v-for="(result, index) in gameState.results" :key="index">
-                                    <p>{{ result.player }} scored {{ result.score }} points.</p>
-                                </div>
-                            </div>
-
                             <!-- 5. Scores -->
-                            <div v-else-if="playerInfo.state === 'waitingScores'">
+                            <div v-else-if="gameState.phase === 'scores'">
                                 <h3>Scores</h3>
-                                <div v-for="(player, index) in gameState.players" :key="index">
-                                    <p>{{ player.username }}: {{ player.score }}</p>
+                                <div class="podium-container">
+                                    <div
+                                        v-for="(positionData, index) in gameState.updateScores"
+                                        :key="index"
+                                        :class="['podium-box', getPositionClass(positionData.position)]"
+                                    >
+                                        <div class="podium-position">
+                                            {{ positionData.position }}{{ getOrdinalSuffix(positionData.position) }} Place
+                                        </div>
+                                        <div
+                                            v-for="(player, pIndex) in positionData.players"
+                                            :key="pIndex"
+                                            class="podium-player"
+                                        >
+                                            <div class="podium-player-name">{{ player[0] }}</div>
+                                            <div class="podium-player-score">{{ player[1] }}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- 6. End Game -->
+                            <!-- 7. End Game -->
                             <div v-else-if="playerInfo.state === 'waitingEndgame'">
                                 <h3>Game Over</h3>
                                 <p>Thank you for playing!</p>

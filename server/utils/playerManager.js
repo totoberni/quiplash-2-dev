@@ -248,19 +248,18 @@ class PlayerManager {
         return { success: true };
     }
 
-    // Handle vote submission by a player
-    submitVote(gameState, player, answer) {
-        if (!player || gameState.phase !== 'voting') {
-            return { success: false, message: 'Player cannot submit votes.' };
+    submitVote(gameState, player, answerUsername) {
+        if (player.state !== 'active') {
+            return { success: false, message: 'Player cannot vote in current state.' };
         }
-        if (player.vote && player.vote.length > 0) {
+        if (!gameState.votes) {
+            gameState.votes = [];
+        }
+        // Check if player has already voted
+        if (gameState.votes.some(vote => vote[1] === player.username)) {
             return { success: false, message: 'Player has already voted.' };
         }
-        gameState.votes.push([answer[1], player.username]);
-        if (!player.vote) {
-            player.vote = [];
-        }
-        player.vote.push([answer[1], player.username]);
+        gameState.votes.push([answerUsername, player.username]);
         player.state = 'submitted';
         return { success: true };
     }

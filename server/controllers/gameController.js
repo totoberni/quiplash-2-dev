@@ -231,7 +231,7 @@ function handleSubmitVote(socket, data, io) {
         const gameLogic = game.gameLogic;
         const player = playerManager.getPlayerByUsername(username);
         if (player) {
-            const result = playerManager.submitVote(gameLogic.gameState, player, data.answer);
+            const result = playerManager.submitVote(gameLogic.gameState, player, data.answerUsername);
             if (result.success) {
                 socket.emit('message', { message: 'Vote submitted successfully.' });
             } else {

@@ -16,8 +16,9 @@ var app = new Vue({
         successMsg: '',
         suggestionText: '',
         suggestedPrompt: '',
-        gameState: null, // Contains gameLogic variables from the server
-        playerInfo: null, // Stores player object and all its variables
+        selectedOptionIndex: null,
+        gameState: null, // Contains gameLogic object from the server
+        playerInfo: null, // Stores player object 
         showJoinGameForm: false,
         gameCode: '',
         promptText: '', // Captures user input for prompt submission
@@ -123,10 +124,40 @@ var app = new Vue({
                 this.answers = [];
             }
         },
-        submitVote(answer) {
-            if (socket) {
-                socket.emit('submitVote', { answer: answer });
+        selectOption(index) {
+            this.selectedOptionIndex = index;
+        },
+        submitVote() {
+            if (this.selectedOptionIndex !== null) {
+                const selectedOption = this.gameState.votingOptions[this.selectedOptionIndex];
+                const answerUsername = selectedOption[0];
+                if (socket) {
+                    socket.emit('submitVote', { answerUsername });
+                    this.selectedOptionIndex = null; // Reset selection
+                } else {
+                    this.errorMsg = 'Not connected to the server.';
+                }
+            } else {
+                this.errorMsg = 'Please select an option to vote.';
             }
+        },
+        getPositionClass(position) {
+            switch (position) {
+                case 1:
+                    return 'gold';
+                case 2:
+                    return 'silver';
+                case 3:
+                    return 'bronze';
+                default:
+                    return 'standard';
+            }
+        },
+        getOrdinalSuffix(position) {
+            if (position === 1) return 'st';
+            if (position === 2) return 'nd';
+            if (position === 3) return 'rd';
+            return 'th';
         },
     }
 });
