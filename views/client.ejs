@@ -100,7 +100,17 @@
                                     </div>
                                 </div>
                             </div>
-
+                            <!-- 6. Next Round -->
+                            <div v-else-if="gameState.phase === 'nextRound'">
+                                <h3>Next Round</h3>
+                                <p>Get ready for the next round!</p>
+                                <div class="timer">
+                                    <p>Next round starts in {{ timer }} seconds</p>
+                                    <div class="progress-bar">
+                                        <div class="progress" :style="{ width: progressBarWidth + '%' }"></div>
+                                    </div>
+                                </div>
+                            </div>
                             <!-- 7. End Game -->
                             <div v-else-if="playerInfo.state === 'waitingEndgame'">
                                 <h3>Game Over</h3>

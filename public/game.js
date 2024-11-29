@@ -24,6 +24,9 @@ var app = new Vue({
         promptText: '', // Captures user input for prompt submission
         answers: [], // Captures user input for answers
         promptInputs: [], // For handling multiple prompts
+        timer: 0,
+        progressBarWidth: 100,
+        timerInterval: null,
     },
     methods: {
         handleChat(data) {
@@ -141,6 +144,7 @@ var app = new Vue({
                 this.errorMsg = 'Please select an option to vote.';
             }
         },
+        // Displaying the podium
         getPositionClass(position) {
             switch (position) {
                 case 1:
@@ -159,7 +163,44 @@ var app = new Vue({
             if (position === 3) return 'rd';
             return 'th';
         },
-    }
+        startTimer() {
+            if (this.gameState.nextRoundStartTime) {
+                const endTime = this.gameState.nextRoundStartTime;
+                this.updateTimer(endTime);
+                this.timerInterval = setInterval(() => {
+                    this.updateTimer(endTime);
+                }, 100); // Update every 100ms for smooth progress bar
+            }
+        },
+        updateTimer(endTime) {
+            const now = Date.now();
+            const remaining = Math.max(0, endTime - now);
+            this.timer = Math.ceil(remaining / 1000); // Convert to seconds, round up
+            this.progressBarWidth = (remaining / 8000) * 100; // Percentage for progress bar
+
+            if (remaining <= 0) {
+                this.stopTimer();
+            }
+        },
+        stopTimer() {
+            if (this.timerInterval) {
+                clearInterval(this.timerInterval);
+                this.timerInterval = null;
+            }
+        },
+    },
+    watch: {
+        'gameState.phase': function(newPhase) {
+            if (newPhase === 'nextRound') {
+                this.startTimer();
+            } else {
+                this.stopTimer();
+            }
+        },
+    },
+    beforeDestroy() {
+        this.stopTimer();
+    },
 });
 
 function connect(sessionId) {

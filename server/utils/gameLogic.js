@@ -364,7 +364,7 @@ class GameLogic extends EventEmitter {
             this.gameState.phase = 'scores';
             this.gameStateUpdate(io, playerManager);
             this.advanceGameState(io, playerManager);
-        }, 20000); // Adjust the timeout as needed
+        }, 5000); // Adjust the timeout as needed
     }
 
     // Phase 6: Show scores
@@ -377,7 +377,7 @@ class GameLogic extends EventEmitter {
             this.gameState.phase = 'nextRound';
             this.gameStateUpdate(io, playerManager);
             this.advanceGameState(io, playerManager);
-        }, 20000); // Adjust the timeout as needed
+        }, 5000); // Adjust the timeout as needed
     }
 
     // Phase 7: Next round or end game

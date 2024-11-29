@@ -129,7 +129,12 @@ class PlayerManager {
             case 'scores':
                 this.getPlayers().concat(this.getAudience()).forEach((client) => client.state = 'waitingScores');
                 break;
+            case 'nextRound':
+                this.getPlayers().concat(this.getAudience()).forEach((player) => player.state = 'waitingNextRound');
+                this.updatePlayersNextRound();
+                break;
             case 'endGame':
+                this.getPlayers().concat(this.getAudience()).forEach((player) => player.state = 'waitingEndGame');
                 this.updatePlayersAfterGame();
                 break;
             default:
@@ -148,19 +153,24 @@ class PlayerManager {
         }
     }
 
-    // Update players' scores and states after a game ends
-    updatePlayersAfterGame() {
+    updatePlayersNextRound() {
         for (let player of this.getPlayers()) {
-            player.gamesPlayed += 1;
             player.score += player.roundScore;
             player.roundScore = 0;
             player.assignedPrompts = [];
             player.submittedPrompts = [];
             player.answers = [];
             player.vote = [];
-            player.state = 'waitingEndgame';
             player.justJoined = false;
         }
+    }
+
+    // Update players' scores and states after a game ends
+    updatePlayersAfterGame() {
+        for (let player of this.getPlayers()) {
+            player.gamesPlayed += 1;
+        }
+        this.updatePlayersNextRound();
     }
 
     // Update player's info before logging out
