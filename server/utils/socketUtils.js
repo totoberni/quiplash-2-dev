@@ -25,7 +25,7 @@ module.exports.initializeSocket = (io) => {
     });
 
     io.on('connection', (socket) => {
-        console.log('New client connected:', 'Session: ', socket.handshake.auth.sessionId, socket.id, 'User:', socket.user);
+        console.log('New client connected:', 'Session:', socket.handshake.auth.sessionId, socket.id, 'User:', socket.user);
 
         // Handle chat messages
         socket.on('chat', (data) => {
@@ -45,6 +45,11 @@ module.exports.initializeSocket = (io) => {
         // Handle submit prompt
         socket.on('submitPrompt', (data) => {
             gameController.handleSubmitPrompt(socket, data, io);
+        });
+
+        // Handle generate prompt suggestion
+        socket.on('generatePromptSuggestion', (data) => {
+            gameController.handleGeneratePromptSuggestion(socket, data, io);
         });
 
         // Handle submit answers

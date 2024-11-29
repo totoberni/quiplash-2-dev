@@ -31,11 +31,7 @@ function updatePlayer(gameCode, socket) {
         const player = playerManager.getPlayerByUsername(username);
         if (player) {
             socket.emit('playerInfo', { playerInfo: player });
-        } else {
-            console.log(`Player ${username} not found in game ${gameCode}`);
         }
-    } else {
-        console.log(`Game ${gameCode} not found`);
     }
 }
 
@@ -50,12 +46,8 @@ function updateAllPlayers(gameCode, io) {
             const socket = io.sockets.sockets.get(socketId);
             if (socket) {
                 updatePlayer(gameCode, socket);
-            } else {
-                console.log(`Socket for player ${player.username} not found`);
             }
         });
-    } else {
-        console.log(`Game ${gameCode} not found`);
     }
 }
 
@@ -67,7 +59,6 @@ function gameCreate(socket, io) {
         const playerManager = new PlayerManager();
 
         // Initialize gameState
-        gameLogic.gameState = gameLogic.gameState || {};
         gameLogic.gameState.phase = 'joining';
 
         // Generate a unique game code
@@ -89,8 +80,7 @@ function gameCreate(socket, io) {
 
         // Set up event listeners for game logic events
         gameLogic.on('phaseChanged', (newPhase) => {
-            io.to(gameCode).emit('gamePhase', { phase: newPhase });
-            // Update player states if needed
+            io.to(gameCode).emit('gameStateUpdate', { gameState: gameLogic.getGameState() });
             updateAllPlayers(gameCode, io);
         });
 
@@ -98,31 +88,11 @@ function gameCreate(socket, io) {
             updateAllPlayers(gameCode, io);
         });
 
-        // Handle specific events emitted by gameLogic
-        gameLogic.on('assignedPrompts', (assignedPromptsByPlayer) => {
-            Object.keys(assignedPromptsByPlayer).forEach(username => {
-                const player = playerManager.getPlayerByUsername(username);
-                if (player) {
-                    const socketId = player.socketId;
-                    const socket = io.sockets.sockets.get(socketId);
-                    if (socket) {
-                        socket.emit('assignedPrompts', { assignedPrompts: assignedPromptsByPlayer[username] });
-                    }
-                }
-            });
-        });
-
-        gameLogic.on('votingOptions', (votingOptions) => {
-            io.to(gameCode).emit('votingOptions', { votingOptions });
-        });
-
-        gameLogic.on('gameResults', (results) => {
-            io.to(gameCode).emit('gameResults', { results });
-        });
-
         // Emit to the client that the game has been created
         socket.emit('gameCreated', { gameCode });
-        console.log(`Game created by ${username} with code ${gameCode}`);
+
+        // Send initial game state to the client
+        socket.emit('gameStateUpdate', { gameState: gameLogic.getGameState() });
 
         // Update client sockets with the player info
         updatePlayer(gameCode, socket);
@@ -148,7 +118,7 @@ function gameJoin(socket, data, io) {
             socket.join(gameCode);
             socket.gameCode = gameCode;
             socket.emit('gameJoined', { gameCode });
-            io.to(gameCode).emit('message', { message: `${username} has joined the game.` });
+            socket.emit('gameStateUpdate', { gameState: gameLogic.getGameState() });
             updatePlayer(gameCode, socket);
             updateAllPlayers(gameCode, io);
         } else {
@@ -169,8 +139,6 @@ function handleChatMessage(socket, data, io) {
         return;
     }
 
-    console.log(`Handling chat from ${username}: ${message}`);
-
     const gameCode = socket.gameCode;
     if (gameCode) {
         io.to(gameCode).emit('chat', { username, message });
@@ -188,8 +156,6 @@ function handleDisconnect(socket, io) {
     if (game) {
         const playerManager = game.playerManager;
         playerManager.removeUserBySocketId(socket.id);
-        console.log(`Player ${username} disconnected from game ${gameCode}`);
-        io.to(gameCode).emit('message', { message: `${username} has disconnected.` });
         updateAllPlayers(gameCode, io);
 
         // Remove the game if no players are left
@@ -219,6 +185,18 @@ function handleSubmitPrompt(socket, data, io) {
             }
         }
     }
+}
+
+function handleGeneratePromptSuggestion(socket, data, io) {
+    const topic = data.topic || 'random quiplash prompt';
+    apiUtils.suggestPrompt(topic)
+        .then(response => {
+            socket.emit('suggestedPrompt', { suggestedPrompt: response.suggestion });
+        })
+        .catch(error => {
+            console.error('Error generating prompt suggestion:', error);
+            socket.emit('error', { message: 'Failed to generate prompt suggestion.' });
+        });
 }
 
 function handleSubmitAnswers(socket, data, io) {
@@ -270,6 +248,7 @@ module.exports = {
     handleChatMessage,
     handleDisconnect,
     handleSubmitPrompt,
+    handleGeneratePromptSuggestion,
     handleSubmitAnswers,
     handleSubmitVote
 };

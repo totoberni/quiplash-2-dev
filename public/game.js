@@ -2,7 +2,6 @@
 
 var socket = null;
 
-// Prepare game
 var app = new Vue({
     el: '#game',
     data: {
@@ -15,16 +14,15 @@ var app = new Vue({
         chatmessage: '',
         errorMsg: '',
         successMsg: '',
-        gameState: null,
-        playerInfo: null,
+        suggestionText: '',
+        suggestedPrompt: '',
+        gameState: null, // Contains gameLogic variables from the server
+        playerInfo: null, // Stores player object and all its variables
         showJoinGameForm: false,
         gameCode: '',
-        gamePhase: '',
-        promptText: '',
-        answers: [],
-        votingOptions: [],
-        gameResults: [],
-        playerList: [],
+        promptText: '', // Captures user input for prompt submission
+        answers: [], // Captures user input for answers
+        promptInputs: [], // For handling multiple prompts
     },
     methods: {
         handleChat(data) {
@@ -43,7 +41,6 @@ var app = new Vue({
             }
         },
         register() {
-            console.log('Register method called');
             this.errorMsg = '';
             this.successMsg = '';
             axios.post('/player/register', {
@@ -51,7 +48,6 @@ var app = new Vue({
                 password: this.password
             })
             .then(response => {
-                console.log('Registration response:', response.data);
                 if (response.data.result) {
                     this.successMsg = 'Registration successful! You can now login.';
                 } else {
@@ -64,7 +60,6 @@ var app = new Vue({
             });
         },
         login() {
-            console.log('Login method called');
             this.errorMsg = '';
             this.successMsg = '';
             axios.post('/player/login', {
@@ -72,7 +67,6 @@ var app = new Vue({
                 password: this.password
             })
             .then(response => {
-                console.log('Login response:', response.data);
                 if (response.data.result) {
                     this.loggedIn = true;
                     this.successMsg = 'Login successful!';
@@ -110,6 +104,18 @@ var app = new Vue({
                 socket.emit('submitPrompt', { text: this.promptText });
                 this.promptText = '';
             }
+        },
+        generatePromptSuggestion() {
+            if (socket) {
+                socket.emit('generatePromptSuggestion', { topic: this.suggestionText });
+                this.suggestionText = '';
+            } else {
+                this.errorMsg = 'Not connected to the server.';
+            }
+        },
+        // Handle suggested prompt from server
+        handleSuggestedPrompt(data) {
+            this.suggestedPrompt = data.suggestedPrompt;
         },
         submitAnswers() {
             if (socket && this.answers.length > 0) {
@@ -150,25 +156,17 @@ function connect(sessionId) {
         app.playerInfo = data.playerInfo;
     });
 
-    socket.on('gamePhase', function(data) {
-        app.gamePhase = data.phase;
+    socket.on('gameStateUpdate', function(data) {
+        app.gameState = data.gameState;
+    });
+
+    socket.on('suggestedPrompt', function(data) {
+        app.handleSuggestedPrompt(data);
     });
 
     socket.on('assignedPrompts', function(data) {
         app.playerInfo.assignedPrompts = data.assignedPrompts;
         app.answers = new Array(data.assignedPrompts.length).fill('');
-    });
-
-    socket.on('votingOptions', function(data) {
-        app.votingOptions = data.votingOptions;
-    });
-
-    socket.on('gameResults', function(data) {
-        app.gameResults = data.results;
-    });
-
-    socket.on('playerList', function(data) {
-        app.playerList = data.players;
     });
 
     socket.on('disconnect', function() {

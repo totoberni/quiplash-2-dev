@@ -19,93 +19,118 @@
                     <p v-if="errorMsg" class="alert alert-danger">{{ errorMsg }}</p>
                 </div>
 
-                <!-- Conditional Screens Based on playerInfo.state -->
-                <div v-if="playerInfo">
-                    <!-- 1. Lobby -->
-                    <div v-if="playerInfo.state === 'waitingPlayers'">
-                        <h3>Waiting for Players...</h3>
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                <div class="row">
+                    <!-- Left Column -->
+                    <div class="col-md-8">
+                        <!-- Conditional Screens Based on playerInfo.state -->
+                        <div v-if="playerInfo">
+                            <!-- 1. Lobby -->
+                            <div v-if="playerInfo.state === 'waitingPlayers'">
+                                <h3>Waiting for Players...</h3>
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+
+                            <!-- 2. Submit Answers -->
+                            <div v-else-if="playerInfo.state === 'active' && gameState.phase === 'answers'">
+                                <h3>Submit Your Answers</h3>
+                                <div v-for="(prompt, index) in playerInfo.assignedPrompts" :key="index" class="mb-3">
+                                    <p><strong>Prompt:</strong> {{ prompt[1] }}</p>
+                                    <input type="text" v-model="answers[index]" placeholder="Your answer" class="form-control">
+                                </div>
+                                <button @click="submitAnswers" class="btn btn-primary">Submit Answers</button>
+                            </div>
+
+                            <!-- 3. Voting -->
+                            <div v-else-if="playerInfo.state === 'active' && gameState.phase === 'voting'">
+                                <h3>Vote for the Best Answer</h3>
+                                <div v-for="(answer, index) in gameState.votes" :key="index" class="mb-3">
+                                    <p><strong>Prompt:</strong> {{ answer.promptText }}</p>
+                                    <div v-for="(option, optIndex) in answer.options" :key="optIndex">
+                                        <button @click="submitVote(option)" class="btn btn-secondary mb-2">{{ option.answerText }}</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4. Results -->
+                            <div v-else-if="playerInfo.state === 'waitingResults'">
+                                <h3>Results</h3>
+                                <div v-for="(result, index) in gameState.results" :key="index">
+                                    <p>{{ result.player }} scored {{ result.score }} points.</p>
+                                </div>
+                            </div>
+
+                            <!-- 5. Scores -->
+                            <div v-else-if="playerInfo.state === 'waitingScores'">
+                                <h3>Scores</h3>
+                                <div v-for="(player, index) in gameState.players" :key="index">
+                                    <p>{{ player.username }}: {{ player.score }}</p>
+                                </div>
+                            </div>
+
+                            <!-- 6. End Game -->
+                            <div v-else-if="playerInfo.state === 'waitingEndgame'">
+                                <h3>Game Over</h3>
+                                <p>Thank you for playing!</p>
+                            </div>
+
+                            <!-- Default Case -->
+                            <div v-else>
+                                <p>Unknown state: {{ playerInfo.state }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Initial Screen -->
+                        <div v-else>
+                            <!-- Welcome Screen -->
+                            <div class="welcome-screen mb-3">
+                                <button @click="gameCreate" class="btn btn-primary">Create Game</button>
+                                <button @click="showJoinGame" class="btn btn-secondary">Join Game</button>
+                            </div>
+
+                            <!-- Join Game Form -->
+                            <div v-if="showJoinGameForm" class="join-game-form mt-3">
+                                <div class="input-group">
+                                    <input type="text" v-model="gameCode" placeholder="Enter Game Code" class="form-control" @keyup.enter="submitGameCode">
+                                    <button @click="submitGameCode" class="btn btn-primary">Submit</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- 2. Submit Prompts -->
-                    <div v-else-if="playerInfo.state === 'active' && gamePhase === 'prompts'">
-                        <h3>Submit Your Prompt</h3>
-                        <div class="mb-3">
-                            <input type="text" v-model="promptText" placeholder="Enter your prompt" class="form-control">
+                    <!-- Right Column -->
+                    <div class="col-md-4">
+                        <!-- Chat Section (Available at any game phase) -->
+                        <div id="chat-section" class="mb-4">
+                            <h4>Game Chat</h4>
+                            <%- include('chat'); -%>
                         </div>
-                        <button @click="submitPrompt" class="btn btn-primary">Submit Prompt</button>
-                    </div>
 
-                    <!-- 3. Submit Answers -->
-                    <div v-else-if="playerInfo.state === 'active' && gamePhase === 'answers'">
-                        <h3>Submit Your Answers</h3>
-                        <div v-for="(prompt, index) in playerInfo.assignedPrompts" :key="index" class="mb-3">
-                            <p><strong>Prompt:</strong> {{ prompt[1] }}</p>
-                            <input type="text" v-model="answers[index]" placeholder="Your answer" class="form-control">
-                        </div>
-                        <button @click="submitAnswers" class="btn btn-primary">Submit Answers</button>
-                    </div>
+                        <!-- Prompt Submission and Suggestions (Available when game has started) -->
+                        <div v-if="gameState && gameState.phase !== 'joining'">
+                            <!-- Prompt Submission Box -->
+                            <div class="prompt-submission mb-4">
+                                <h4>Submit a Prompt</h4>
+                                <div class="mb-3">
+                                    <input type="text" v-model="promptText" placeholder="Enter your prompt" class="form-control">
+                                </div>
+                                <button @click="submitPrompt" class="btn btn-primary">Submit Prompt</button>
+                            </div>
 
-                    <!-- 4. Votes -->
-                    <div v-else-if="playerInfo.state === 'active' && gamePhase === 'voting'">
-                        <h3>Vote for the Best Answer</h3>
-                        <div v-for="(answer, index) in votingOptions" :key="index" class="mb-3">
-                            <p><strong>Prompt:</strong> {{ answer[0] }}</p>
-                            <button @click="submitVote(answer[1])" class="btn btn-secondary">{{ answer[2] }}</button>
-                        </div>
-                    </div>
-
-                    <!-- 5. Results -->
-                    <div v-else-if="playerInfo.state === 'waitingResults'">
-                        <h3>Results</h3>
-                        <div v-for="(result, index) in gameResults" :key="index">
-                            <p>{{ result.answerUsername }} scored {{ result.answerScore }} points.</p>
+                            <!-- Suggestions Box -->
+                            <div class="suggestions-box">
+                                <h4>Generate Prompt Suggestion</h4>
+                                <div class="mb-3">
+                                    <input type="text" v-model="suggestionText" placeholder="Enter a topic (optional)" class="form-control">
+                                </div>
+                                <button @click="generatePromptSuggestion" class="btn btn-secondary">Generate Prompt</button>
+                                <div v-if="suggestedPrompt" class="mt-3">
+                                    <p><strong>Suggested Prompt:</strong> {{ suggestedPrompt }}</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <!-- 6. Scores -->
-                    <div v-else-if="playerInfo.state === 'waitingScores'">
-                        <h3>Scores</h3>
-                        <div v-for="(player, index) in playerList" :key="index">
-                            <p>{{ player.username }}: {{ player.score }}</p>
-                        </div>
-                    </div>
-
-                    <!-- 7. End Game -->
-                    <div v-else-if="playerInfo.state === 'waitingEndgame'">
-                        <h3>Game Over</h3>
-                        <p>Thank you for playing!</p>
-                    </div>
-
-                    <!-- Default Case -->
-                    <div v-else>
-                        <p>Unknown state: {{ playerInfo.state }}</p>
-                    </div>
-                </div>
-
-                <!-- Initial Screen -->
-                <div v-else>
-                    <!-- Welcome Screen -->
-                    <div class="welcome-screen mb-3">
-                        <button @click="gameCreate" class="btn btn-primary">Create Game</button>
-                        <button @click="showJoinGame" class="btn btn-secondary">Join Game</button>
-                    </div>
-
-                    <!-- Join Game Form -->
-                    <div v-if="showJoinGameForm" class="join-game-form mt-3">
-                        <div class="input-group">
-                            <input type="text" v-model="gameCode" placeholder="Enter Game Code" class="form-control" @keyup.enter="submitGameCode">
-                            <button @click="submitGameCode" class="btn btn-primary">Submit</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Chat Section -->
-                <div id="chat-section" class="mt-4">
-                    <h4>Game Chat</h4>
-                    <%- include('chat'); -%>
                 </div>
             </div>
             <div v-else>
