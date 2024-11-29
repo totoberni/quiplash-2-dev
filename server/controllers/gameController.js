@@ -79,7 +79,7 @@ function gameCreate(socket, io) {
         socket.gameCode = gameCode; // Store game code on socket
 
         // Set up event listeners for game logic events
-        gameLogic.on('phaseChanged', (newPhase) => {
+        gameLogic.on('phaseChanged', () => {
             io.to(gameCode).emit('gameStateUpdate', { gameState: gameLogic.getGameState() });
             updateAllPlayers(gameCode, io);
         });

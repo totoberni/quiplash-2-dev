@@ -5,6 +5,7 @@
 
 const EventEmitter = require('events');
 const apiUtils = require('./apiUtils');
+const e = require('express');
 
 class GameLogic extends EventEmitter {
 
@@ -19,10 +20,11 @@ class GameLogic extends EventEmitter {
             activePrompts: [], // [[promptUsername, text]]
             submittedPrompts: [], // [[promptUsername, text]]
             answers: [], // [[promptUsername, answerUsername, text]]
+            votingOptions: [], // [{ promptText, options: [{ answerUsername, answerText }] }]
             votes: [], // [[answerUsername, voteUsername]]
             roundNumber: 1,
             totalRounds: 3,
-            updateScores: [], // [{ answerUsername, answerScore }]
+            updateScores: [], // [[] answerUsername, answerScore ]]
             numPlayers: 0, // Added to keep track of the number of players
         };
     }
@@ -48,9 +50,17 @@ class GameLogic extends EventEmitter {
         return (this.gameState.submittedPrompts.length / needPrompts) >= 0.5;
     }
 
+    async allAnswersSubmitted() {
+        return this.gameState.answers.length >= this.gameState.activePrompts.length;
+    }
+
+    async allVotesSubmitted() {
+        return this.gameState.votes.length >= this.gameState.answers.length;
+    }
+
     // Updates players and client sockets on the game state
     async gameStateUpdate(io, playerManager) {
-        io.emit(`Round ${this.gameState.roundNumber}, Phase Change: ${this.gameState.phase}`);
+        io.emit('gameStateUpdate', { gameState: this.getGameState() });
         playerManager.updatePlayersOnGameState(this.gameState.phase, this.gameState);
 
         // Emit events
@@ -165,7 +175,11 @@ class GameLogic extends EventEmitter {
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
             } else {
-                console.log('Waiting for players...');
+                elapsedSeconds += 1;
+                if (elapsedSeconds % 10 === 0) {
+                    io.emit('message', { message: 'Waiting for more players...' });
+                    console.log('Waiting for players...');
+                }
             }
         }, 1000);
     }
@@ -183,7 +197,11 @@ class GameLogic extends EventEmitter {
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
             } else {
-                console.log('Waiting for prompts...');
+                elapsedSeconds += 1;
+                if (elapsedSeconds % 10 === 0) {
+                    console.log('Waiting for prompts...');
+                    io.emit('message', { message: 'Waiting for prompts...' });
+                }
             }
         }, 1000);
     }
@@ -193,12 +211,24 @@ class GameLogic extends EventEmitter {
         this.gameState.phase = 'answers';
         this.gameStateUpdate(io, playerManager);
 
-        // Wait for answers or set a timer
-        setTimeout(() => {
-            this.gameState.phase = 'voting';
-            this.gameStateUpdate(io, playerManager);
-            this.advanceGameState(io, playerManager);
-        }, 10000); // Adjust the timeout as needed
+        let elapsedSeconds = 0;
+
+        const intervalId = setInterval(async () => {
+            if (await this.allAnswersSubmitted()) {
+                clearInterval(intervalId);
+                this.gameState.phase = 'voting';
+                this.gameStateUpdate(io, playerManager);
+                this.advanceGameState(io, playerManager);
+            } else {
+                elapsedSeconds += 1;
+                if (elapsedSeconds % 10 === 0) {
+                    console.log('Waiting for answers...');
+                    io.emit('message', { message: 'Waiting for answers...' });
+                }
+                // Implement a maximum waiting time if desired
+                // For example, if elapsedSeconds >= maxWaitingTime, force progression
+            }
+        }, 1000);
     }
 
     // Phase 4: Start voting
@@ -207,14 +237,59 @@ class GameLogic extends EventEmitter {
         this.gameStateUpdate(io, playerManager);
 
         // Emit voting options
-        io.emit('votingOptions', { votingOptions: this.gameState.answers });
+        this.prepareVotingOptions(io, playerManager);
 
-        // Wait for votes or set a timer
-        setTimeout(() => {
-            this.gameState.phase = 'results';
-            this.gameStateUpdate(io, playerManager);
-            this.advanceGameState(io, playerManager);
-        }, 10000); // Adjust the timeout as needed
+        let elapsedSeconds = 0;
+
+        const intervalId = setInterval(async () => {
+            if (await this.allVotesSubmitted()) {
+                clearInterval(intervalId);
+                this.gameState.phase = 'results';
+                this.gameStateUpdate(io, playerManager);
+                this.advanceGameState(io, playerManager);
+            } else {
+                elapsedSeconds += 1;
+                if (elapsedSeconds % 10 === 0) {
+                    console.log('Waiting for players to vote...');
+                    io.emit('message', { message: 'Waiting for players to vote...' });
+                }
+                // Implement a maximum waiting time if desired
+                // For example, if elapsedSeconds >= maxWaitingTime, force progression
+            }
+        }, 1000);
+    }
+
+    // Helper method to prepare voting options
+    prepareVotingOptions(io) {
+        // Assuming you need to structure the voting options in a specific way
+        // For example, group answers by prompt
+        const votingOptions = [];
+
+        const promptsMap = new Map(); // Map prompt text to array of answers
+
+        for (const answer of this.gameState.answers) {
+            const [promptUsername, answerUsername, answerText] = answer;
+            const promptText = this.gameState.activePrompts.find(p => p[0] === promptUsername)[1];
+
+            if (!promptsMap.has(promptText)) {
+                promptsMap.set(promptText, []);
+            }
+            promptsMap.get(promptText).push({
+                answerUsername,
+                answerText
+            });
+        }
+
+        // Convert map to array
+        for (const [promptText, options] of promptsMap.entries()) {
+            votingOptions.push({
+                promptText,
+                options
+            });
+        }
+
+        this.gameState.votingOptions = votingOptions;
+        io.emit('gameStateUpdate', { gameState: this.getGameState() });
     }
 
     // Phase 5: Show results
@@ -224,20 +299,29 @@ class GameLogic extends EventEmitter {
 
         // Calculate and emit results
         const results = this.calculateVoteScores();
-        io.emit('gameResults', { results });
+        this.gameState.results = results;
+        io.emit('gameStateUpdate', { gameState: this.getGameState() });
 
         setTimeout(() => {
             this.gameState.phase = 'scores';
             this.gameStateUpdate(io, playerManager);
             this.advanceGameState(io, playerManager);
-        }, 5000); // Adjust the timeout as needed
+        }, 10000); // Adjust the timeout as needed
     }
 
     // Phase 6: Next round or end game
     async nextRoundOrEndGame(io, playerManager) {
         if (this.gameState.roundNumber < this.gameState.totalRounds) {
             this.gameState.roundNumber += 1;
+            // Reset necessary game state properties for the new round
             this.gameState.phase = 'prompts';
+            this.gameState.activePrompts = [];
+            this.gameState.submittedPrompts = [];
+            this.gameState.answers = [];
+            this.gameState.votes = [];
+            this.gameState.updateScores = [];
+            this.gameState.votingOptions = [];
+            this.gameState.results = [];
             this.gameStateUpdate(io, playerManager);
             this.advanceGameState(io, playerManager);
         } else {
