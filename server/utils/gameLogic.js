@@ -17,7 +17,6 @@ class GameLogic {
 
     resetGameState() {
         this.gameState = {
-            gameCode: this.generateGameCode(),
             phase: 'joining',
             activePrompts: [],// [[promptUsername, text]] all prompts that can be voted on  
             submittedPrompts: [], // [[promptUsername, text]] all prompts submitted by players
@@ -27,12 +26,6 @@ class GameLogic {
             totalRounds: 3,
             updateScores: [], // [[username, answerScore]] May need to update this later
         };
-    }
-
-    
-    // Create a function that generates a unique game code
-    generateGameCode() {
-        return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
 
     // Getters

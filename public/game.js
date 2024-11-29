@@ -8,7 +8,7 @@ var app = new Vue({
     data: {
         connected: false,
         loggedIn: false,
-        inGame: false,
+        //inGame: false,
         username: '',
         password: '',
         sessionId: '',
@@ -17,7 +17,7 @@ var app = new Vue({
         errorMsg: '',
         successMsg: '',
         gameState: null,
-        playerInfo: null,
+        playerInfo: null, // Add corresponding player object here
         showJoinGameForm: false,  // To control the visibility of the join game form
         gameCode: ''              // To store the entered game code
     },
@@ -87,7 +87,7 @@ var app = new Vue({
         gameCreate() {
             if (socket) {
                 socket.emit('gameCreate');
-                this.inGame = true; // Use 'this' to refer to data properties
+                //this.inGame = true; // Use 'this' to refer to data properties
             } else {
                 this.errorMsg = 'Not connected to the server.';
             }
@@ -98,7 +98,7 @@ var app = new Vue({
         submitGameCode() {
             if (socket) {
                 socket.emit('gameJoin', { gameCode: this.gameCode });
-                this.inGame = true;
+                //this.inGame = true;
                 this.showJoinGameForm = false;
             } else {
                 this.errorMsg = 'Not connected to the server.';
@@ -133,6 +133,10 @@ function connect(sessionId) {
         app.inGame = true;
         app.gameCode = data.gameCode; // Store the game code
         app.successMsg = `Joined game with code: ${data.gameCode}`;
+    });
+
+    socket.on('updatePlayerInfo', function(data) { // Store player info for the logged in player
+        app.playerInfo = data.playerInfo;
     });
 
     // Handle disconnection

@@ -6,8 +6,9 @@ const PlayerManager = require('../utils/playerManager');
 const GameLogic = require('../utils/gameLogic');
 const apiUtils = require('../utils/apiUtils');
 
-const activeGames = {}; // Use an object to store games by game code
+const activeGames = {}; // Keep track of active games
 
+// Identify gameLogic and playerManager objects using a gamecode.
 function generateGameCode() {
     const codeLength = 6;
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -19,6 +20,43 @@ function generateGameCode() {
         }
     } while (activeGames[code]); // Ensure the code is unique
     return code;
+}
+
+// Update a single player's info
+function updatePlayer(gameCode, socket) {
+    const game = activeGames[gameCode];
+    if (game) {
+        const playerManager = game[1];
+        const username = socket.user;
+        const player = playerManager.getPlayerByUsername(username);
+        if (player) {
+            socket.emit('updatePlayerInfo', { playerInfo: player });
+        } else {
+            console.log(`Player ${username} not found in game ${gameCode}`);
+        }
+    } else {
+        console.log(`Game ${gameCode} not found`);
+    }
+}
+
+// Update all players' info in the game
+function updateAllPlayers(gameCode, io) {
+    const game = activeGames[gameCode];
+    if (game) {
+        const playerManager = game[1];
+        const players = playerManager.getPlayers();
+        players.forEach(player => {
+            const socketId = player.socketId;
+            const socket = io.sockets.sockets.get(socketId);
+            if (socket) {
+                updatePlayer(gameCode, socket);
+            } else {
+                console.log(`Socket for player ${player.username} not found`);
+            }
+        });
+    } else {
+        console.log(`Game ${gameCode} not found`);
+    }
 }
 
 // Starting a new Game
@@ -48,8 +86,10 @@ function gameCreate(socket, io) {
 
         // Emit to the client that the game has been created
         socket.emit('gameCreated', { gameCode });
-
         console.log(`Game created by ${username} with code ${gameCode}`);
+
+        // Update client sockets with the player info
+        updatePlayer(gameCode, socket);
     } else {
         socket.emit('error', { message: 'Unable to start the game. User is invalid' });
     }
@@ -64,16 +104,13 @@ function gameJoin(socket, data, io) {
     if (game) {
         const playerManager = game[1];
         const gameLogic = game[0];
-
         const added = playerManager.addPlayer(username, socket.id, gameLogic.gameState.phase);
-
         if (added) {
             socket.join(gameCode);
             socket.gameCode = gameCode;
-
             socket.emit('gameJoined', { gameCode });
-
-            socket.to(gameCode).emit('message', { message: `${username} has joined the game.` });
+            console.log(gameCode).emit('message', { message: `${username} has joined the game.` }); // Will need to put this in io later: io.to(gameCode).emit('message', { message: `${username} has joined the game.` });
+            updatePlayer(gameCode, socket); /// Update player info
         } else {
             socket.emit('error', { message: 'Could not join the game. It might be full or you are already in it.' });
         }
@@ -87,14 +124,7 @@ function findGameBySocketId(socketId) {
     return Object.values(activeGames).find(([_, playerManager]) => playerManager.getPlayerBySocketId(socketId));
 }
 
-function updatePlayerList(gameCode, io) {
-    const game = activeGames[gameCode];
-    if (game) {
-        const playerManager = game[1];
-        const players = playerManager.getPlayers().map((player) => player.username);
-        io.to(gameCode).emit('updatePlayerList', { players });
-    }
-}
+
 
 // Handle Chat Messages
 function handleChatMessage(socket, data, io) {
@@ -143,4 +173,5 @@ module.exports = {
     gameJoin,
     handleChatMessage,
     handleDisconnect,
+    findGameBySocketId
 };

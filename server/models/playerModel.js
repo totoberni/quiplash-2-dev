@@ -12,7 +12,7 @@ class Player {
       this.assignedPrompts = []; // [[promptUsername, text]] can contain up to 2 prompts
       this.answers = []; //[[promptUsername, answerUsername, answer]] can contain up to 2 answers 
       this.vote = []; // [answerUsername, voteUsername] only 1 vote
-      this.state = 'waiting'; // Keeps track of players' state
+      this.state = 'joining'; // Keeps track of players' state
       this.justJoined = true; // Reset at the end of each round
     }
   }

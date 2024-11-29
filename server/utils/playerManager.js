@@ -92,14 +92,14 @@ class PlayerManager {
     updatePlayersOnGameState(gameStatePhase) {
         switch (gameStatePhase) {
             case 'joining':
-                getPlayers().concat(getAudience()).forEach((player) => player.state = 'waiting');
+                getPlayers().concat(getAudience()).forEach((player) => player.state = 'waitingPlayers');
                 break;
             case 'prompts':
                 getPlayers().concat(getAudience()).forEach((player) => player.state = 'active');
                 this.getPlayers().forEach((player) => player.justJoined = false); // Enable them to play starting from this round
                 break;
             case 'answers':
-                getAudience().forEach((player) => player.state = 'waiting');
+                getAudience().forEach((player) => player.state = 'waitingAnswers');
                 getPlayers().forEach((player) => player.state = 'active');
                 break;
             case 'voting':
@@ -107,18 +107,20 @@ class PlayerManager {
                 break;
             case 'results':
                 updatePlayersOnResults(gameState);
-                getPlayers().concat(getAudience()).forEach((player) => player.state = 'waiting');
+                getPlayers().concat(getAudience()).forEach((player) => player.state = 'waitingResults');
                 break;
             case 'scores':
-                getPlayers().concat(getAudience()).forEach((client) => client.state = "waiting");
+                getPlayers().concat(getAudience()).forEach((client) => client.state = "waitingScores");
                 break;
             case 'endGame':
                 updatePlayersAfterGame(player);
-                getPlayers().concat(getAudience()).forEach((client) => this.removeUser(client.username)); // figure out what happens here
+                
+                //getPlayers().concat(getAudience()).forEach((client) => this.removeUser(client.username)); // figure out what happens here
             default:
                 console.log('Error updating player states.');
         }
     }
+    // Update players' scores based on game results calculated in gameLogic.js as answerScore
     updatePlayersOnResults(gameState) {
         for (entry in gameState.updateScores) {
             const player = getPlayerByUsername(entry.answerUsername);
@@ -126,6 +128,7 @@ class PlayerManager {
             player.score += roundScore;
         }
     }
+    // Update players' scores and states after a game ends
     updatePlayersAfterGame(player) {
         for (player in getPlayers()) {
             player.gamesPlayed += 1;
@@ -135,11 +138,12 @@ class PlayerManager {
             player.submittedPrompts = [];
             player.answer = [];
             player.vote = [];
-            player.state = 'waiting';
+            player.state = 'waitingEndgame';
             player.justJoined = false;
             }
     }
-    updateClientBeforeLogout(client) {
+    // Update player's info before logging out
+    updateClientBeforeLogout(client) { // Client is still a player object
         client.score += client.roundScore;
         apiUtils.editPlayer(client.username, client.gamesPlayed, client.score);
         client.roundScore = 0;
@@ -244,19 +248,5 @@ class PlayerManager {
         player.assignedPrompts.push(prompt);
     }
 }        
-
-function addPlayer(player, socketId, gameStatePhase) {
-    if (this.isPlayer(player.username)|| this.isAudience(player.username)) {
-      return false; // Username already taken
-    }
-    if (this.getPlayers().length === 8) {
-        this.addAudience(username, socketId);
-        return false; // Room is full
-    }
-    const isAdmin = getPlayers() == 0 || null|| undefined; // First player is admin
-    const justJoined = gameStatePhase !== joining;
-    this.players.push(new Player(socketId, username, isAdmin, justJoined)); // justJoined is true if player joins during a game
-    return true;
-  }
 
 module.exports = PlayerManager;

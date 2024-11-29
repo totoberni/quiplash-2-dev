@@ -18,7 +18,7 @@
                     <p v-if="successMsg" class="alert alert-success">{{ successMsg }}</p>
                     <p v-if="errorMsg" class="alert alert-danger">{{ errorMsg }}</p>
                 </div>
-
+                
                 <!-- Conditional Screens -->
                 <div v-if="!inGame">
                     <!-- Welcome Screen -->
@@ -42,6 +42,12 @@
                         <h3>Game Lobby</h3>
                         <p>Game Code: {{ gameCode }}</p>
                         <p>Waiting for Players to Join</p>
+                        <div v-if="playerInfo">
+                            <p>Your Username: {{ playerInfo.username }}</p>
+                            <p>Your Score: {{ playerInfo.score }}</p>
+                            <p>Your State: {{ playerInfo.state }}</p>
+                            <!-- Add other playerInfo properties as needed -->
+                        </div>
                         <!-- Chat Section -->
                         <div id="chat-section" class="mt-4">
                             <h4>Game Chat</h4>
