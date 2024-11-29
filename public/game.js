@@ -8,7 +8,6 @@ var app = new Vue({
     data: {
         connected: false,
         loggedIn: false,
-        //inGame: false,
         username: '',
         password: '',
         sessionId: '',
@@ -17,9 +16,15 @@ var app = new Vue({
         errorMsg: '',
         successMsg: '',
         gameState: null,
-        playerInfo: null, // Add corresponding player object here
-        showJoinGameForm: false,  // To control the visibility of the join game form
-        gameCode: ''              // To store the entered game code
+        playerInfo: null,
+        showJoinGameForm: false,
+        gameCode: '',
+        gamePhase: '',
+        promptText: '',
+        answers: [],
+        votingOptions: [],
+        gameResults: [],
+        playerList: [],
     },
     methods: {
         handleChat(data) {
@@ -71,9 +76,7 @@ var app = new Vue({
                 if (response.data.result) {
                     this.loggedIn = true;
                     this.successMsg = 'Login successful!';
-                    // Store the sessionId
                     this.sessionId = response.data.sessionId;
-                    // Now connect to socket.io
                     connect(this.sessionId);
                 } else {
                     this.errorMsg = response.data.msg;
@@ -87,7 +90,6 @@ var app = new Vue({
         gameCreate() {
             if (socket) {
                 socket.emit('gameCreate');
-                //this.inGame = true; // Use 'this' to refer to data properties
             } else {
                 this.errorMsg = 'Not connected to the server.';
             }
@@ -98,62 +100,87 @@ var app = new Vue({
         submitGameCode() {
             if (socket) {
                 socket.emit('gameJoin', { gameCode: this.gameCode });
-                //this.inGame = true;
                 this.showJoinGameForm = false;
             } else {
                 this.errorMsg = 'Not connected to the server.';
             }
-        }
+        },
+        submitPrompt() {
+            if (socket && this.promptText.trim() !== '') {
+                socket.emit('submitPrompt', { text: this.promptText });
+                this.promptText = '';
+            }
+        },
+        submitAnswers() {
+            if (socket && this.answers.length > 0) {
+                socket.emit('submitAnswers', { answers: this.answers });
+                this.answers = [];
+            }
+        },
+        submitVote(answer) {
+            if (socket) {
+                socket.emit('submitVote', { answer: answer });
+            }
+        },
     }
 });
 
 function connect(sessionId) {
-    // Prepare web socket with authentication
     socket = io({
         auth: {
             sessionId: sessionId
         }
     });
 
-    // Connect
     socket.on('connect', function() {
-        // Set connected state to true
         app.connected = true;
     });
 
-    // Handle game created event
     socket.on('gameCreated', function(data) {
-        app.inGame = true;
-        app.gameCode = data.gameCode; // Store the game code
+        app.gameCode = data.gameCode;
         app.successMsg = `Game created with code: ${data.gameCode}`;
     });
 
-    // Handle game joined event
     socket.on('gameJoined', function(data) {
-        app.inGame = true;
-        app.gameCode = data.gameCode; // Store the game code
+        app.gameCode = data.gameCode;
         app.successMsg = `Joined game with code: ${data.gameCode}`;
     });
 
-    socket.on('updatePlayerInfo', function(data) { // Store player info for the logged in player
+    socket.on('playerInfo', function(data) {
         app.playerInfo = data.playerInfo;
     });
 
-    // Handle disconnection
+    socket.on('gamePhase', function(data) {
+        app.gamePhase = data.phase;
+    });
+
+    socket.on('assignedPrompts', function(data) {
+        app.playerInfo.assignedPrompts = data.assignedPrompts;
+        app.answers = new Array(data.assignedPrompts.length).fill('');
+    });
+
+    socket.on('votingOptions', function(data) {
+        app.votingOptions = data.votingOptions;
+    });
+
+    socket.on('gameResults', function(data) {
+        app.gameResults = data.results;
+    });
+
+    socket.on('playerList', function(data) {
+        app.playerList = data.players;
+    });
+
     socket.on('disconnect', function() {
         alert('Disconnected');
         app.connected = false;
     });
 
-    // Handle incoming chat message
     socket.on('chat', function(data) {
         app.handleChat(data);
     });
 
-    // Handle errors from the server
     socket.on('error', function(data) {
         app.errorMsg = data.message;
     });
-
-    // Other event handlers as needed
 }

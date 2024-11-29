@@ -138,7 +138,7 @@ module.exports = {
   async getPrompts(players, language) {
     console.log('API: getPrompts called');
     try {
-      const response = await axios.get(`${BACKEND_ENDPOINT}utils/get`, {
+      const response = await axios.post(`${BACKEND_ENDPOINT}utils/get`, {
         params: {
           players: players,
           language : language
