@@ -213,6 +213,7 @@ function handleSubmitAnswers(socket, data, io) {
                 const prompt = player.assignedPrompts[index];
                 const result = playerManager.submitAnswer(gameLogic.gameState, player, answer, prompt);
                 if (!result.success) {
+                    console.error('Error submitting answer:', result.message);
                     socket.emit('error', { message: result.message });
                 }
             });

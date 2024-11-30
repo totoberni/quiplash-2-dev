@@ -26,7 +26,6 @@ var app = new Vue({
         promptInputs: [], // For handling multiple prompts
         timer: 0,
         progressBarWidth: 100,
-        timerInterval: null,
     },
     methods: {
         handleChat(data) {
@@ -123,6 +122,7 @@ var app = new Vue({
         },
         submitAnswers() {
             if (socket && this.answers.length > 0) {
+                console.log('Submitting answers:', this.answers);
                 socket.emit('submitAnswers', { answers: this.answers });
                 this.answers = [];
             }
@@ -164,16 +164,15 @@ var app = new Vue({
             return 'th';
         },
         startTimer() {
-            if (this.gameState.nextRoundStartsAt > 0) {
-                const endTime = this.gameState.nextRoundStartsAt;
-                const duration = endTime - Date.now();
+            if (this.gameState.serverTime > 0) {
+                const duration = 8000 + this.gameState.serverTime - Date.now();
                 this.timerInterval = setInterval(() => {
-                    this.updateTimer(endTime, duration);
+                    this.updateTimer(duration);
                 }, 100); // Update every 100ms for smooth progress bar
             }
         },
-        updateTimer(endTime, duration) {
-            const remaining = Math.max(0, endTime - Date.now());
+        updateTimer(duration) {
+            const remaining =  duration - (Date.now() - this.gameState.serverTime);
             this.timer = Math.ceil(remaining / 1000); // Convert to seconds, round up
             this.progressBarWidth = (remaining / duration) * 100; // Percentage for progress bar
 
@@ -199,6 +198,11 @@ var app = new Vue({
     },
     beforeDestroy() {
         this.stopTimer();
+    },
+    computed: {
+        filteredVotingOptions() {
+            return this.gameState.votingOptions.filter(option => option[0] !== this.username);
+        }
     },
 });
 
@@ -229,6 +233,9 @@ function connect(sessionId) {
 
     socket.on('gameStateUpdate', function(data) {
         app.gameState = data.gameState;
+        if (app.gameState.phase === 'nextRound') {
+            app.startTimer();
+        }
     });
 
     socket.on('suggestedPrompt', function(data) {

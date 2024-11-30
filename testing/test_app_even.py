@@ -24,6 +24,7 @@ users = [
     {'username': 'testuser', 'password': 'testpassword'},
     {'username': 'testuser2', 'password': 'testpassword2'},
     {'username': 'testuser3', 'password': 'testpassword3'},
+    {'username': 'testuser4', 'password': 'testpassword4'},
 ]
 
 # Create browser instances for each user
@@ -51,6 +52,7 @@ for idx, browser in enumerate(browsers):
     # Click the Login button
     login_button = browser.find_element(By.XPATH, '//button[text()="Login"]')
     login_button.click()
+    print(f"Browser {idx + 1} logged in as {user['username']}.")
 
 # Now, in the first browser (User A), create a game
 browser_a = browsers[0]
@@ -74,8 +76,8 @@ else:
     print('Game code not found')
     exit(1)
 
-# In the other browsers (Users B and C), join the game using the game code
-for browser in browsers[1:]:
+# In the other browsers, join the game using the game code
+for idx, browser in enumerate(browsers[1:], start=1):
     wait = WebDriverWait(browser, wait_times['medium'])
     # Wait for the Join Game button
     join_game_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Join Game"]')))
@@ -86,6 +88,7 @@ for browser in browsers[1:]:
     # Click the Submit button
     submit_button = browser.find_element(By.XPATH, '//button[text()="Submit"]')
     submit_button.click()
+    print(f"Browser {idx + 1} joined the game with code {game_code}.")
 
 # Wait for all browsers to reach the prompt submission phase
 time.sleep(5)  # Adjust the sleep time based on your application's timing
@@ -93,7 +96,7 @@ time.sleep(5)  # Adjust the sleep time based on your application's timing
 # Now, all users submit the prompt 'What is your favorite hobby?'
 prompt_text = 'What is your favorite hobby?'
 
-for browser in browsers:
+for idx, browser in enumerate(browsers):
     wait = WebDriverWait(browser, wait_times['medium'])
     # Wait for the prompt input to appear
     try:
@@ -102,8 +105,9 @@ for browser in browsers:
         # Click the Submit Prompt button
         submit_prompt_button = browser.find_element(By.XPATH, '//button[text()="Submit Prompt"]')
         submit_prompt_button.click()
+        print(f"Browser {idx + 1} submitted a prompt.")
     except Exception as e:
-        print(f'Error submitting prompt in one of the browsers: {e}')
+        print(f'Error submitting prompt in browser {idx + 1}: {e}')
 
 # Wait for the game to progress to the 'Submit Your Answers' phase
 time.sleep(10)  # Adjust the sleep time based on your application's timing
@@ -133,12 +137,7 @@ for idx, browser in enumerate(browsers):
 time.sleep(10)  # Adjust the sleep time based on your application's timing
 
 # Now, simulate voting
-# We want two browsers to vote for option 1, and one browser to vote for option 2
-
-# Define the voting choices for each browser
-# Browsers 0 and 1 will vote for option 1
-# Browser 2 will vote for option 2
-voting_choices = [1, 1, 1]
+# Each browser will vote for an answer that is not their own
 
 for idx, browser in enumerate(browsers):
     wait = WebDriverWait(browser, wait_times['long'])
@@ -149,19 +148,32 @@ for idx, browser in enumerate(browsers):
         # Wait for voting options to be present
         voting_options = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.proportional-box.voting-option')))
 
-        # Select the voting choice
-        choice_index = voting_choices[idx] - 1  # Adjust for zero-based index
-        if choice_index < len(voting_options):
-            voting_option = voting_options[choice_index]
-            browser.execute_script("arguments[0].scrollIntoView();", voting_option)
-            voting_option.click()
+        # Get the current player's username
+        user = users[idx]
+        username = user['username']
 
-            # Wait for the 'Submit Vote' button to appear
-            submit_vote_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Submit Vote"]')))
-            submit_vote_button.click()
-            print(f"Browser {idx + 1} voted for option {voting_choices[idx]}")
-        else:
-            print(f"Browser {idx + 1}: Voting option {voting_choices[idx]} not found")
+        # Collect valid voting options (exclude own answers)
+        valid_options = []
+        for i, option in enumerate(voting_options):
+            # Extract the answerUsername from the option
+            answer_by_element = option.find_element(By.XPATH, './/p[strong[text()="Answer by:"]]')
+            answer_username = answer_by_element.text.replace('Answer by:', '').strip()
+            if answer_username != username:
+                valid_options.append((i, option))
+
+        if not valid_options:
+            print(f"Browser {idx + 1}: No valid options to vote for (cannot vote for own answer).")
+            continue
+
+        # Select the first valid option (or you can randomize)
+        choice_index, voting_option = valid_options[0]
+        browser.execute_script("arguments[0].scrollIntoView();", voting_option)
+        voting_option.click()
+
+        # Wait for the 'Submit Vote' button to appear
+        submit_vote_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[text()="Submit Vote"]')))
+        submit_vote_button.click()
+        print(f"Browser {idx + 1} voted for option {choice_index + 1}")
     except Exception as e:
         print(f'Error during voting in browser {idx + 1}: {e}')
 

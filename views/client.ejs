@@ -47,7 +47,7 @@
                                 <h3>Vote for the Best Answer</h3>
                                 <div class="proportional-container">
                                     <div
-                                        v-for="(option, index) in gameState.votingOptions"
+                                        v-for="(option, index) in filteredVotingOptions"
                                         :key="index"
                                         class="proportional-box voting-option"
                                         :class="{ selected: selectedOptionIndex === index }"

@@ -251,14 +251,14 @@ class PlayerManager {
         if (!player.assignedPrompts.includes(prompt)) {
             return { success: false, message: 'Player has not been assigned this prompt.' };
         }
-        if (player.answers && player.answers.includes(prompt)) {
-            return { success: false, message: 'Player cannot answer the same prompt twice.' };
-        }
-        gameState.answers.push([prompt[0], player.username, text]);
         if (!player.answers) {
             player.answers = [];
         }
-        player.answers.push([prompt[0], player.username, text]);
+
+        gameState.answers.push([prompt[0], player.username, text]);
+        console.log('Answer pushed for:', player.username);
+
+        // player.answers.push([prompt[0], player.username, text]);
         if (player.answers.length === player.assignedPrompts.length) {
             player.state = 'submitted';
         }
@@ -269,15 +269,18 @@ class PlayerManager {
         if (player.state !== 'active') {
             return { success: false, message: 'Player cannot vote in current state.' };
         }
+        if (player.vote.username === answerUsername) { // made redundant because UI only displays selectable options
+            console.log('Player cannot vote for their answers.');
+            return { success: false, message: 'Player cannot vote for their answers!.' };
+        }
         if (!gameState.votes) {
             gameState.votes = [];
         }
         // Check if player has already voted
-        if (gameState.votes.some(vote => vote[1] === player.username)) {
-            return { success: false, message: 'Player has already voted.' };
-        }
         gameState.votes.push([answerUsername, player.username]);
-        player.state = 'submitted';
+        if (player.assignedPrompts.length === gameState.votes.length) {
+            player.state = 'submitted';
+        }
         return { success: true };
     }
 
