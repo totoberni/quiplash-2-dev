@@ -55,7 +55,6 @@ class PlayerManager {
         const response = await apiUtils.getPrompts(allUsernames, language);
         if (Array.isArray(response)) {
           const apiPrompts = response.map(({ username, text }) => [username, text]);
-          console.log('Prompts fetched:', apiPrompts);
           return apiPrompts;
         } else {
           console.log('Error fetching prompts.');

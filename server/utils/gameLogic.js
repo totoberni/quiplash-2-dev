@@ -184,14 +184,11 @@ class GameLogic extends EventEmitter {
         const numPlayers = players.length;
         this.gameState.numPlayers = numPlayers;
         const needPrompts = numPlayers % 2 === 0 ? numPlayers : numPlayers * 2;
-
-        io.emit('message', { message: `Assigning ${needPrompts} prompts to ${numPlayers} players.` });
-        console.log('assignPrompts: Starting prompt assignment.');
+        //io.emit('message', { message: `Assigning ${needPrompts} prompts to ${numPlayers} players.` }); Add for better UX
 
         // Fetch prompts until we have enough
         while (!await this.enoughPrompts(playerManager)) {
             const fetchedPrompts = await playerManager.fetchPrompts('en');
-            console.log('assignPrompts: Fetched prompts:', fetchedPrompts);
             this.gameState.activePrompts.push(...fetchedPrompts);
             if (this.gameState.activePrompts.length < needPrompts) {
                 await this.generatePrompts();
