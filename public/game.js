@@ -164,19 +164,18 @@ var app = new Vue({
             return 'th';
         },
         startTimer() {
-            if (this.gameState.nextRoundStartTime) {
-                const endTime = this.gameState.nextRoundStartTime;
-                this.updateTimer(endTime);
+            if (this.gameState.nextRoundStartsAt > 0) {
+                const endTime = this.gameState.nextRoundStartsAt;
+                const duration = endTime - Date.now();
                 this.timerInterval = setInterval(() => {
-                    this.updateTimer(endTime);
+                    this.updateTimer(endTime, duration);
                 }, 100); // Update every 100ms for smooth progress bar
             }
         },
-        updateTimer(endTime) {
-            const now = Date.now();
-            const remaining = Math.max(0, endTime - now);
+        updateTimer(endTime, duration) {
+            const remaining = Math.max(0, endTime - Date.now());
             this.timer = Math.ceil(remaining / 1000); // Convert to seconds, round up
-            this.progressBarWidth = (remaining / 8000) * 100; // Percentage for progress bar
+            this.progressBarWidth = (remaining / duration) * 100; // Percentage for progress bar
 
             if (remaining <= 0) {
                 this.stopTimer();

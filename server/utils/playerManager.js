@@ -50,15 +50,16 @@ class PlayerManager {
         return this.getAudience().find((p) => p.username === audience.username);
     }
 
-    // Fetch Prompts returns all prompts submitted in previous games by the players
     async fetchPrompts(language) {
         const allUsernames = this.getPlayers().concat(this.getAudience()).map((p) => p.username);
         const response = await apiUtils.getPrompts(allUsernames, language);
-        if (response.prompts) {
-            const apiPrompts = response.prompts.map(({ username, text }) => [username, text]);
-            return apiPrompts;
+        if (Array.isArray(response)) {
+          const apiPrompts = response.map(({ username, text }) => [username, text]);
+          console.log('Prompts fetched:', apiPrompts);
+          return apiPrompts;
         } else {
-            return [];
+          console.log('Error fetching prompts.');
+          return [];
         }
     }
 

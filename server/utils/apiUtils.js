@@ -158,21 +158,24 @@ module.exports = {
     }
   },
 
-  // Get Prompts
   async getPrompts(players, language) {
     console.log('API: getPrompts called');
     try {
-      const response = await axios.post(`${BACKEND_ENDPOINT}utils/get`, {
-        params: {
+      const response = await axios.post(
+        `${BACKEND_ENDPOINT}utils/get`,
+        {
           players: players,
-          language : language
+          language: language,
         },
-      });
+        {
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
       console.log('Backend API response:', response.data);
       return response.data; // Expected to have an array of prompts
     } catch (error) {
       console.error('API getPrompts Error:', error.message);
-      return {msg : error.response?.data?.msg || 'Unknown error occurred'};
+      return { msg: error.response?.data?.msg || 'Unknown error occurred' };
     }
   },
 };
