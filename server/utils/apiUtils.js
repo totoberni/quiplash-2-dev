@@ -5,7 +5,7 @@
 const axios = require('axios');
 
 // Use the Azure endpoint
-const BACKEND_ENDPOINT = process.env.BACKEND || 'http://127.0.0.1:7071/a pi/';
+const BACKEND_ENDPOINT = process.env.BACKEND || 'http://127.0.0.1:7071/api/';
 
 // Optional: Log the BACKEND_ENDPOINT for debugging
 console.log('Backend Endpoint:', BACKEND_ENDPOINT);
