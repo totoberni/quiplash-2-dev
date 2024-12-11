@@ -122,6 +122,9 @@ var app = new Vue({
             if (socket) {
                 socket.emit('nextPhaseRequest');
                 this.showNextPhaseButton = false;
+                if (this.gameState.phase === 'nextRound') {
+                    this.stopTimer();
+                }
             } else {
                 this.errorMsg = 'Not connected to the server.';
             }
@@ -176,7 +179,7 @@ var app = new Vue({
         // Timer methods
         startTimer() {
             if (this.gameState.serverTime > 0) {
-                const duration = 8000 + this.gameState.serverTime - Date.now();
+                const duration = 10000 + this.gameState.serverTime - Date.now();
                 this.timerInterval = setInterval(() => {
                     this.updateTimer(duration);
                 }, 100); // Update every 100ms for smooth progress bar

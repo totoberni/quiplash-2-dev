@@ -404,7 +404,7 @@ class GameLogic extends EventEmitter {
                     this.advanceGameState(io, playerManager);
                     clearInterval(intervalId);   
                 }
-            }, 10000); // 10 seconds timer added for style points
+            }, 100); // 10 seconds timer added for style points
         } else {
             this.gameState.phase = 'endGame';
             this.gameStateUpdate(io, playerManager);

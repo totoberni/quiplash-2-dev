@@ -199,6 +199,8 @@ body {
     border-radius: 10px;
     overflow: hidden;
     margin-top: 10px;
+    margin-left: 20px;
+    margin-right: 20px;
 }
 
 .progress {
