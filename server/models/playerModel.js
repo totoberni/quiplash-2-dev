@@ -1,10 +1,11 @@
 // server/models/playerModel.js
 
 class Player {
-    constructor(socketId, username, isAdmin) {
+    constructor(socketId, username, isAdmin, justJoined) {
       this.socketId = socketId; 
       this.username = username; 
       this.isAdmin = isAdmin; // Admin flag
+      this.nextPhaseRequest = false; // Admin request flag to progress game phase
       this.score = 0; 
       this.roundScore = 0; 
       this.gamesPlayed = 0; 
@@ -13,7 +14,7 @@ class Player {
       this.answers = []; //[[promptUsername, answerUsername, answer]] can contain up to 2 answers 
       this.vote = []; // [answerUsername, voteUsername] only 1 vote
       this.state = 'joining'; // Keeps track of players' state
-      this.justJoined = true; // Reset at the end of each round
+      this.justJoined = justJoined; // Reset at the end of each round
     }
   }
   

@@ -17,9 +17,10 @@ var app = new Vue({
         suggestionText: '',
         suggestedPrompt: '',
         selectedOptionIndex: null,
-        gameState: null, // Contains gameLogic object from the server
-        playerInfo: null, // Stores player object 
+        gameState: null, // Contains gameLogic object as detailed by gameModel.js
+        playerInfo: null, // Stores player object as detailed by playerModel.js
         showJoinGameForm: false,
+        showNextPhaseButton: false,
         gameCode: '',
         promptText: '', // Captures user input for prompt submission
         answers: [], // Captures user input for answers
@@ -116,6 +117,15 @@ var app = new Vue({
                 this.errorMsg = 'Not connected to the server.';
             }
         },
+        //Next Phase Request
+        nextPhaseRequest() {
+            if (socket) {
+                socket.emit('nextPhaseRequest');
+                showNextPhaseButton = false;
+            } else {
+                this.errorMsg = 'Not connected to the server.';
+            }
+        },
         // Handle suggested prompt from server
         handleSuggestedPrompt(data) {
             this.suggestedPrompt = data.suggestedPrompt;
@@ -163,6 +173,7 @@ var app = new Vue({
             if (position === 3) return 'rd';
             return 'th';
         },
+        // Timer methods
         startTimer() {
             if (this.gameState.serverTime > 0) {
                 const duration = 8000 + this.gameState.serverTime - Date.now();
@@ -235,6 +246,11 @@ function connect(sessionId) {
         app.gameState = data.gameState;
         if (app.gameState.phase === 'nextRound') {
             app.startTimer();
+        }
+        const phasesRequiringNextPhase = ['joining', 'prompts', 'answers', 'voting', 'results', 'scores', 'nextRound', 'endGame']; // 
+        if (app.playerInfo.isAdmin){
+            app.showNextPhaseButton = phasesRequiringNextPhase.includes(app.gameState.phase);
+            console.log('Admin:', app.showNextPhaseButton);
         }
     });
 

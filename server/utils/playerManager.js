@@ -40,6 +40,7 @@ class PlayerManager {
 
     getAdmin() {
         return this.getPlayers().find((player) => player.isAdmin);
+        
     }
 
     getAudience() {
@@ -86,8 +87,8 @@ class PlayerManager {
 
     // Add new clients
     addPlayer(username, socketId, gameStatePhase) {
-        const player = this.getPlayerByUsername(username);
-        if (player) {
+        const existingPlayer = this.getPlayerByUsername(username);
+        if (existingPlayer) {
             return false; // Username already taken
         }
         if (this.getPlayers().length >= 8) {
@@ -96,7 +97,9 @@ class PlayerManager {
         }
         const isAdmin = this.getPlayers().length === 0; // First player is admin
         const justJoined = gameStatePhase !== 'joining';
-        this.players.push(new Player(socketId, username, isAdmin, justJoined));
+        const newPlayer = new Player(socketId, username, isAdmin, justJoined);
+        this.players.push(newPlayer);
+        console.log(`Player ${username} added with clearance: ${newPlayer.isAdmin ? 'true' : 'false'}`);
         return true;
     }
 
@@ -182,6 +185,7 @@ class PlayerManager {
         client.submittedPrompts = [];
         client.answers = [];
         client.vote = [];
+        client.nextPhaseRequest = false; 
         client.state = 'offline';
         client.justJoined = false;
     }
@@ -256,9 +260,7 @@ class PlayerManager {
         }
 
         gameState.answers.push([prompt[0], player.username, text]);
-        console.log('Answer pushed for:', player.username);
-
-        // player.answers.push([prompt[0], player.username, text]);
+        player.answers.push([prompt[0], player.username, text]);
         if (player.answers.length === player.assignedPrompts.length) {
             player.state = 'submitted';
         }

@@ -79,22 +79,17 @@ function gameCreate(socket, io) {
         socket.gameCode = gameCode; // Store game code on socket
 
         // Set up event listeners for game logic events
-        gameLogic.on('phaseChanged', () => {
+        gameLogic.on('gameStateUpdate', () => {
             io.to(gameCode).emit('gameStateUpdate', { gameState: gameLogic.getGameState() });
-            updateAllPlayers(gameCode, io);
-        });
-
-        gameLogic.on('playerUpdate', () => {
             updateAllPlayers(gameCode, io);
         });
 
         // Emit to the client that the game has been created
         socket.emit('gameCreated', { gameCode });
+        updatePlayer(gameCode, socket);
 
-        // Send initial game state to the client
+        // Send initial game state and player info to the client
         socket.emit('gameStateUpdate', { gameState: gameLogic.getGameState() });
-
-        // Update client sockets with the player info
         updatePlayer(gameCode, socket);
 
         // Start the game logic
@@ -119,13 +114,33 @@ function gameJoin(socket, data, io) {
             socket.gameCode = gameCode;
             socket.emit('gameJoined', { gameCode });
             socket.emit('gameStateUpdate', { gameState: gameLogic.getGameState() });
-            updatePlayer(gameCode, socket);
             updateAllPlayers(gameCode, io);
         } else {
             socket.emit('error', { message: 'Could not join the game. It might be full or you are already in it.' });
         }
     } else {
         socket.emit('error', { message: 'Game code not found! Try again' });
+    }
+}
+
+// Handle Next Phase Request
+function handleNextPhaseRequest(socket, io) {
+    // const username = socket.user;
+    const gameCode = socket.gameCode;
+    const game = activeGames[gameCode];
+
+    if (game) {
+        const playerManager = game.playerManager;
+        // const gameLogic = game.gameLogic;
+        const admin = playerManager.getAdmin();
+        if (admin) {
+            console.log('Admin requested next phase');
+            admin.nextPhaseRequest = true;
+        } else {
+            socket.emit('error', { message: 'It seems you are not the admin.' });
+        }
+    } else {
+        socket.emit('error', { message: 'Game not found.' });
     }
 }
 
@@ -246,6 +261,7 @@ function handleSubmitVote(socket, data, io) {
 module.exports = {
     gameCreate,
     gameJoin,
+    handleNextPhaseRequest,
     handleChatMessage,
     handleDisconnect,
     handleSubmitPrompt,

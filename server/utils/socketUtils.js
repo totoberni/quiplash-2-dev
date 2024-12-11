@@ -42,6 +42,11 @@ module.exports.initializeSocket = (io) => {
             gameController.gameJoin(socket, data, io);
         });
 
+        // // Handle a next phase request
+        socket.on('nextPhaseRequest', () => {
+            gameController.handleNextPhaseRequest(socket, io);
+        });
+
         // Handle submit prompt
         socket.on('submitPrompt', (data) => {
             gameController.handleSubmitPrompt(socket, data, io);

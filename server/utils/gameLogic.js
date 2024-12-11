@@ -41,7 +41,7 @@ class GameLogic extends EventEmitter {
     
         // Count votes per answerUsername
         for (const vote of this.gameState.votes) {
-            const [answerUsername, voteUsername] = vote;
+            const [answerUsername, _] = vote; // change to [answerUsername, voteUsername] if needed
             if (!voteCounts[answerUsername]) {
                 voteCounts[answerUsername] = 0;
             }
@@ -138,12 +138,9 @@ class GameLogic extends EventEmitter {
 
     // Updates players and client sockets on the game state
     async gameStateUpdate(io, playerManager) {
-        io.emit('gameStateUpdate', { gameState: this.getGameState() });
+        playerManager.getAdmin().nextPhaseRequest = false; // Put it here to avoid switch statement in playerManager.updatePlayersOnGameState() 
         playerManager.updatePlayersOnGameState(this.gameState.phase, this.gameState);
-
-        // Emit events
-        this.emit('phaseChanged', this.gameState.phase);
-        this.emit('playerUpdate', playerManager.getPlayers());
+        this.emit('gameStateUpdate', { gameState: this.getGameState() });
     }
 
     // Fisher-Yates shuffle
@@ -186,7 +183,6 @@ class GameLogic extends EventEmitter {
         const numPlayers = players.length;
         this.gameState.numPlayers = numPlayers;
         const needPrompts = numPlayers % 2 === 0 ? numPlayers : numPlayers * 2;
-        //io.emit('message', { message: `Assigning ${needPrompts} prompts to ${numPlayers} players.` }); Add for better UX
 
         // Fetch prompts until we have enough
         while (!await this.enoughPrompts(playerManager)) {
@@ -221,6 +217,21 @@ class GameLogic extends EventEmitter {
         }
     }
 
+    // Helper method to prepare voting options
+    async prepareVotingOptions() {
+        const votingOptions = [];
+        console.log('Starting to prepare voting options...');
+        for (const answer of this.gameState.answers) {
+            const [promptUsername, answerUsername, answerText] = answer;
+            const promptEntry = this.gameState.activePrompts.find(p => p[0] === promptUsername);
+            const promptText = promptEntry ? promptEntry[1] : 'Unknown Prompt';
+            console.log('Voting options pushed:', [answerUsername, promptText, answerText]);
+            votingOptions.push([answerUsername, promptText, answerText]);
+        }
+        console.log('Voting options prepared:', votingOptions);
+        this.gameState.votingOptions = votingOptions;
+    }
+
     // Game State Management
     async advanceGameState(io, playerManager) {
         switch (this.gameState.phase) {
@@ -249,7 +260,7 @@ class GameLogic extends EventEmitter {
     async checkAllPlayersReady(io, playerManager) {
         let elapsedSeconds_1 = 0;
         const intervalId = setInterval(() => {
-            if (playerManager.getPlayers().length >= 3) {
+            if (playerManager.getPlayers().length >= 3 && playerManager.getAdmin().nextPhaseRequest) {
                 clearInterval(intervalId);
                 this.gameState.phase = 'prompts';
                 this.gameStateUpdate(io, playerManager);
@@ -261,7 +272,7 @@ class GameLogic extends EventEmitter {
                     console.log('Waiting for players...');
                 }
             }
-        }, 1000);
+        }, 500);
     }
 
     // Phase 2: Start prompt collection
@@ -271,7 +282,7 @@ class GameLogic extends EventEmitter {
         let elapsedSeconds_2 = 0;
 
         const intervalId = setInterval(async () => {
-            if (await this.halfPromptsReceived(playerManager)) {
+            if (await this.halfPromptsReceived(playerManager) && playerManager.getAdmin().nextPhaseRequest) {
                 clearInterval(intervalId);
                 await this.assignPrompts(io, playerManager);
                 this.gameState.phase = 'answers';
@@ -284,7 +295,7 @@ class GameLogic extends EventEmitter {
                     io.emit('message', { message: 'Waiting for prompts...' });
                 }
             }
-        }, 1000);
+        }, 500);
     }
 
     // Phase 3: Start answer submission
@@ -293,7 +304,7 @@ class GameLogic extends EventEmitter {
         this.gameStateUpdate(io, playerManager);
         let elapsedSeconds_3 = 0;
         const intervalId = setInterval(async () => {
-            if (await this.allAnswersSubmitted(playerManager)) {
+            if (await this.allAnswersSubmitted(playerManager) && playerManager.getAdmin().nextPhaseRequest) {
                 clearInterval(intervalId);
                 this.gameState.phase = 'voting';
                 this.gameStateUpdate(io, playerManager);
@@ -307,7 +318,7 @@ class GameLogic extends EventEmitter {
                 // Implement a maximum waiting time if desired
                 // For example, if elapsedSeconds >= maxWaitingTime, force progression
             }
-        }, 1000);
+        }, 500);
     }
 
     // Phase 4: Start voting
@@ -318,7 +329,7 @@ class GameLogic extends EventEmitter {
         this.gameStateUpdate(io, playerManager);
         let elapsedSeconds_4 = 0;
         const intervalId = setInterval(async () => {
-            if (await this.allVotesSubmitted(playerManager)) {
+            if (await this.allVotesSubmitted(playerManager) && playerManager.getAdmin().nextPhaseRequest) {
                 clearInterval(intervalId);
                 this.gameState.phase = 'results';
                 this.gameStateUpdate(io, playerManager);
@@ -329,25 +340,8 @@ class GameLogic extends EventEmitter {
                     console.log('Waiting for players to vote...');
                     io.emit('message', { message: 'Waiting for players to vote...' });
                 }
-                // Implement a maximum waiting time if desired
-                // For example, if elapsedSeconds >= maxWaitingTime, force progression
             }
-        }, 1000);
-    }
-
-    // Helper method to prepare voting options
-    async prepareVotingOptions() {
-        const votingOptions = [];
-        console.log('Starting to prepare voting options...');
-        for (const answer of this.gameState.answers) {
-            const [promptUsername, answerUsername, answerText] = answer;
-            const promptEntry = this.gameState.activePrompts.find(p => p[0] === promptUsername);
-            const promptText = promptEntry ? promptEntry[1] : 'Unknown Prompt';
-            console.log('Voting options pushed:', [answerUsername, promptText, answerText]);
-            votingOptions.push([answerUsername, promptText, answerText]);
-        }
-        console.log('Voting options prepared:', votingOptions);
-        this.gameState.votingOptions = votingOptions;
+        }, 500);
     }
 
     // Phase 5: Show results
@@ -360,10 +354,12 @@ class GameLogic extends EventEmitter {
         io.emit('gameStateUpdate', { gameState: this.getGameState() });
     
         setTimeout(() => {
-            this.gameState.phase = 'scores';
-            this.gameStateUpdate(io, playerManager);
-            this.advanceGameState(io, playerManager);
-        }, 5000); // Adjust the timeout as needed
+            if (playerManager.getAdmin().nextPhaseRequest){
+                this.gameState.phase = 'scores';
+                this.gameStateUpdate(io, playerManager);
+                this.advanceGameState(io, playerManager);
+            }
+        }, 500); // Adjust the timeout as needed
     }
 
     // Phase 6: Show scores
@@ -373,10 +369,12 @@ class GameLogic extends EventEmitter {
         this.gameStateUpdate(io, playerManager);
     
         setTimeout(() => {
-            this.gameState.phase = 'nextRound';
-            this.gameStateUpdate(io, playerManager);
-            this.advanceGameState(io, playerManager);
-        }, 5000); // Adjust the timeout as needed
+            if (playerManager.getAdmin().nextPhaseRequest){
+                this.gameState.phase = 'nextRound';
+                this.gameStateUpdate(io, playerManager);
+                this.advanceGameState(io, playerManager);
+            }
+        }, 1000); // Adjust the timeout as needed
     }
 
     
@@ -388,21 +386,24 @@ class GameLogic extends EventEmitter {
             this.gameState.serverTime = Date.now();
             this.gameStateUpdate(io, playerManager);
             // Start an 8-second timer before starting the next round
-            setTimeout(() => {
-                this.gameState.roundNumber += 1;
-                // Reset necessary game state properties for the new round
-                this.gameState.phase = 'prompts';
-                delete this.gameState.serverTime; // Remove the timer after it's done
-                this.gameState.activePrompts = [];
-                this.gameState.submittedPrompts = [];
-                this.gameState.answers = [];
-                this.gameState.votes = [];
-                this.gameState.updateScores = [];
-                this.gameState.votingOptions = [];
-                this.gameState.results = [];
-                this.gameStateUpdate(io, playerManager);
-                this.advanceGameState(io, playerManager);
-            }, 8000); // 8 seconds timer
+            const intervalId = setInterval(() => {
+                if (playerManager.getAdmin().nextPhaseRequest){
+                    this.gameState.roundNumber += 1;
+                    // Reset necessary game state properties for the new round
+                    this.gameState.phase = 'prompts';
+                    delete this.gameState.serverTime; // Remove the timer after it's done
+                    this.gameState.activePrompts = [];
+                    this.gameState.submittedPrompts = [];
+                    this.gameState.answers = [];
+                    this.gameState.votes = [];
+                    this.gameState.updateScores = [];
+                    this.gameState.votingOptions = [];
+                    this.gameState.results = [];
+                    this.gameStateUpdate(io, playerManager);
+                    this.advanceGameState(io, playerManager);
+                    clearInterval(intervalId);   
+                }
+            }, 10000); // 10 seconds timer added for style points
         } else {
             this.gameState.phase = 'endGame';
             this.gameStateUpdate(io, playerManager);
