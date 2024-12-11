@@ -36,7 +36,7 @@ class GameLogic extends EventEmitter {
         return this.gameState;
     }
 
-    calculateResults() {
+    async calculateResults() {
         const voteCounts = {}; // { answerUsername: votes }
     
         // Count votes per answerUsername
@@ -72,7 +72,7 @@ class GameLogic extends EventEmitter {
         return results; // [[ answerUsername, answerText, votes]] descending order by votes
     }
 
-    calculateVoteScores() {
+    async calculateVoteScores() {
         const playerScores = {}; // { answerUsername: totalScore }
         // Calculate scores for each player
         for (let answer of this.gameState.answers) {
@@ -350,31 +350,32 @@ class GameLogic extends EventEmitter {
         this.gameStateUpdate(io, playerManager);
     
         // Calculate and set results
-        this.gameState.results = this.calculateResults();
+        this.gameState.results = await this.calculateResults();
         io.emit('gameStateUpdate', { gameState: this.getGameState() });
     
-        setTimeout(() => {
+        const intervalId = setInterval(() => {
             if (playerManager.getAdmin().nextPhaseRequest){
                 this.gameState.phase = 'scores';
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
+                clearInterval(intervalId);
             }
         }, 500); // Adjust the timeout as needed
     }
 
     // Phase 6: Show scores
     async showScores(io, playerManager) {
-        this.gameState.phase = 'scores';
-        this.gameState.updateScores = this.calculateVoteScores();
+        this.gameState.updateScores = await this.calculateVoteScores();
         this.gameStateUpdate(io, playerManager);
-    
-        setTimeout(() => {
+        console.log("Next Phase Request: ", playerManager.getAdmin().nextPhaseRequest)
+        const intervalId = setInterval(() => {
             if (playerManager.getAdmin().nextPhaseRequest){
                 this.gameState.phase = 'nextRound';
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
+                clearInterval(intervalId);
             }
-        }, 1000); // Adjust the timeout as needed
+        }, 500); // Adjust the timeout as needed
     }
 
     

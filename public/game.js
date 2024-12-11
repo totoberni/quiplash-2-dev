@@ -121,7 +121,7 @@ var app = new Vue({
         nextPhaseRequest() {
             if (socket) {
                 socket.emit('nextPhaseRequest');
-                showNextPhaseButton = false;
+                this.showNextPhaseButton = false;
             } else {
                 this.errorMsg = 'Not connected to the server.';
             }
