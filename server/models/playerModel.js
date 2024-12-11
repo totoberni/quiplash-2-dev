@@ -12,7 +12,7 @@ class Player {
       this.submittedPrompts = []; // [promptUsername, text] only 1 prompt can be submitted
       this.assignedPrompts = []; // [[promptUsername, text]] can contain up to 2 prompts
       this.answers = []; //[[promptUsername, answerUsername, answer]] can contain up to 2 answers 
-      this.vote = []; // [answerUsername, voteUsername] only 1 vote
+      this.votes = []; // [answerUsername, voteUsername] only 1 vote
       this.state = 'joining'; // Keeps track of players' state
       this.justJoined = justJoined; // Reset at the end of each round
     }

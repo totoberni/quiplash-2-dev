@@ -163,7 +163,7 @@ class PlayerManager {
             player.assignedPrompts = [];
             player.submittedPrompts = [];
             player.answers = [];
-            player.vote = [];
+            player.votes = [];
             player.justJoined = false;
         }
     }
@@ -271,16 +271,15 @@ class PlayerManager {
         if (player.state !== 'active') {
             return { success: false, message: 'Player cannot vote in current state.' };
         }
-        if (player.vote.username === answerUsername) { // made redundant because UI only displays selectable options
+        if (player.votes.username === answerUsername) { // made redundant because UI only displays selectable options
             console.log('Player cannot vote for their answers.');
             return { success: false, message: 'Player cannot vote for their answers!.' };
         }
         if (!gameState.votes) {
             gameState.votes = [];
         }
-        // Check if player has already voted
         gameState.votes.push([answerUsername, player.username]);
-        if (player.assignedPrompts.length === gameState.votes.length) {
+        if (gameState.activePrompts.length === player.votes.length) {
             player.state = 'submitted';
         }
         return { success: true };
