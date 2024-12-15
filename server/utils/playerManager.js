@@ -239,7 +239,7 @@ class PlayerManager {
         const apiResponse = await apiUtils.createPrompt(player.username, text);
         // Check if the API response contains an 'id', indicating success
         if (apiResponse && apiResponse.id) {
-            gameState.submittedPrompts.push([player.username, text]);
+            gameState.activePrompts.push([player.username, text]);
             return { success: true };
         } else {
             // Handle cases where the prompt already exists or other issues

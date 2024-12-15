@@ -18,7 +18,6 @@ class GameLogic extends EventEmitter {
         this.gameState = {
             phase: 'joining',
             activePrompts: [], // [[promptUsername, text]]
-            submittedPrompts: [], // [[promptUsername, text]]
             answers: [], // [[promptUsername, answerUsername, text]]
             votingOptions: [], // [{ promptText, options: [{ answerUsername, answerText }] }]
             votes: [], // [[answerUsername, voteUsername]]
@@ -121,14 +120,14 @@ class GameLogic extends EventEmitter {
     }
 
     async halfPromptsReceived(playerManager) {
-        let numPlayers = playerManager.getPlayers().length;
-        let needPrompts = numPlayers % 2 === 0 ? numPlayers / 2 : numPlayers;
-        return (this.gameState.submittedPrompts.length / needPrompts) >= 0.5;
+        this.gameState.numPlayers = playerManager.getPlayers().length;
+        let needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers / 2 : this.gameState.numPlayers;
+        return (this.gameState.activePrompts.length / needPrompts) >= 0.5;
     }
 
     async allAnswersSubmitted(playerManager) {
-        let numPlayers = playerManager.getPlayers().length;
-        let needPrompts = numPlayers % 2 === 0 ? numPlayers / 2 : numPlayers;
+        this.gameState.numPlayers = playerManager.getPlayers().length;
+        let needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers / 2 : this.gameState.numPlayers;
         return this.gameState.answers.length >= needPrompts*2;  
     }
 
@@ -156,14 +155,13 @@ class GameLogic extends EventEmitter {
 
     // Check if we have enough prompts
     async enoughPrompts(playerManager) {
-        const numPlayers = playerManager.getPlayers().length;
-        const needPrompts = numPlayers % 2 === 0 ? numPlayers / 2 : numPlayers;
+        this.gameState.numPlayers = playerManager.getPlayers().length;
+        const needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers / 2 : this.gameState.numPlayers;
         return (this.gameState.activePrompts.length >= needPrompts);
     }
 
     async generatePrompts() {
-        let numPlayers = this.gameState.numPlayers;
-        let needPrompts = numPlayers % 2 === 0 ? numPlayers / 2 : numPlayers;
+        let needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers / 2 : this.gameState.numPlayers;
         let numGeneratedPrompts = needPrompts - this.gameState.activePrompts.length;
 
         for (let i = 0; i < numGeneratedPrompts; i++) {
@@ -180,9 +178,8 @@ class GameLogic extends EventEmitter {
 
     async assignPrompts(io, playerManager) {
         const players = playerManager.getPlayers();
-        const numPlayers = players.length;
-        this.gameState.numPlayers = numPlayers;
-        const needPrompts = numPlayers % 2 === 0 ? numPlayers : numPlayers * 2;
+        this.gameState.numPlayers = players.length;
+        const needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers : this.gameState.numPlayers * 2;
 
         // Fetch prompts until we have enough
         while (!await this.enoughPrompts(playerManager)) {
@@ -201,8 +198,9 @@ class GameLogic extends EventEmitter {
         const promptsToAssign = shuffledPrompts.slice(0, needPrompts);
         let playerIndex = 0;
         for (const prompt of promptsToAssign) {
-            const player = shuffledPlayers[playerIndex % numPlayers];
+            const player = shuffledPlayers[playerIndex % this.gameState.numPlayers];
             playerManager.assignPromptToPlayer(player, prompt);
+            console.log(`Assigned Prompt: ${prompt[1]} to ${player.username}`);
             playerIndex++;
         }
         console.log('Prompts Assigned');
@@ -282,13 +280,15 @@ class GameLogic extends EventEmitter {
         let elapsedSeconds_2 = 0;
 
         const intervalId = setInterval(async () => {
-            if (await this.halfPromptsReceived(playerManager) && playerManager.getAdmin().nextPhaseRequest) {
-                clearInterval(intervalId);
-                await this.assignPrompts(io, playerManager);
-                this.gameState.phase = 'answers';
-                this.gameStateUpdate(io, playerManager);
-                this.advanceGameState(io, playerManager);
-            } else {
+            if (await this.halfPromptsReceived(playerManager)) {
+                const admin = playerManager.getAdmin();
+                if (admin && admin.nextPhaseRequest) {
+                    clearInterval(intervalId);
+                    await this.assignPrompts(io, playerManager);
+                    this.gameState.phase = 'answers';
+                    this.gameStateUpdate(io, playerManager);
+                    this.advanceGameState(io, playerManager);
+            }} else {
                 elapsedSeconds_2 += 1;
                 if (this.elapsedSeconds % 10 === 0) {
                     console.log('Waiting for prompts...');
@@ -304,12 +304,14 @@ class GameLogic extends EventEmitter {
         this.gameStateUpdate(io, playerManager);
         let elapsedSeconds_3 = 0;
         const intervalId = setInterval(async () => {
-            if (await this.allAnswersSubmitted(playerManager) && playerManager.getAdmin().nextPhaseRequest) {
-                clearInterval(intervalId);
-                this.gameState.phase = 'voting';
-                this.gameStateUpdate(io, playerManager);
-                this.advanceGameState(io, playerManager);
-            } else {
+            if (await this.allAnswersSubmitted(playerManager)){
+                const admin = playerManager.getAdmin();
+                if (admin && admin.nextPhaseRequest) {
+                    clearInterval(intervalId);
+                    this.gameState.phase = 'voting';
+                    this.gameStateUpdate(io, playerManager);
+                    this.advanceGameState(io, playerManager);
+            }} else {
                 elapsedSeconds_3 += 1;
                 if (this.elapsedSeconds % 10 === 0) {
                     console.log('Waiting for answers...');
@@ -329,12 +331,14 @@ class GameLogic extends EventEmitter {
         this.gameStateUpdate(io, playerManager);
         let elapsedSeconds_4 = 0;
         const intervalId = setInterval(async () => {
-            if (await this.allVotesSubmitted(playerManager) && playerManager.getAdmin().nextPhaseRequest) {
+            if (await this.allVotesSubmitted(playerManager)) {
+                const admin = playerManager.getAdmin();
+                if (admin && admin.nextPhaseRequest) {
                 clearInterval(intervalId);
                 this.gameState.phase = 'results';
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
-            } else {
+            }} else {
                 elapsedSeconds_4 += 1;
                 if (this.elapsedSeconds % 10 === 0) {
                     console.log('Waiting for players to vote...');
@@ -345,20 +349,19 @@ class GameLogic extends EventEmitter {
     }
 
     // Phase 5: Show results
-    async showResults(io, playerManager) {
-        this.gameState.phase = 'results';
-        this.gameStateUpdate(io, playerManager);
-    
+    async showResults(io, playerManager) {    
         // Calculate and set results
         this.gameState.results = await this.calculateResults();
         io.emit('gameStateUpdate', { gameState: this.getGameState() });
-    
         const intervalId = setInterval(() => {
             if (playerManager.getAdmin().nextPhaseRequest){
-                this.gameState.phase = 'scores';
-                this.gameStateUpdate(io, playerManager);
-                this.advanceGameState(io, playerManager);
-                clearInterval(intervalId);
+                const admin = playerManager.getAdmin();
+                if (admin && admin.nextPhaseRequest) {
+                    this.gameState.phase = 'scores';
+                    this.gameStateUpdate(io, playerManager);
+                    this.advanceGameState(io, playerManager);
+                    clearInterval(intervalId);
+                }
             }
         }, 500); // Adjust the timeout as needed
     }
@@ -367,9 +370,9 @@ class GameLogic extends EventEmitter {
     async showScores(io, playerManager) {
         this.gameState.updateScores = await this.calculateVoteScores();
         this.gameStateUpdate(io, playerManager);
-        console.log("Next Phase Request: ", playerManager.getAdmin().nextPhaseRequest)
         const intervalId = setInterval(() => {
-            if (playerManager.getAdmin().nextPhaseRequest){
+            const admin = playerManager.getAdmin();
+            if (admin && admin.nextPhaseRequest){
                 this.gameState.phase = 'nextRound';
                 this.gameStateUpdate(io, playerManager);
                 this.advanceGameState(io, playerManager);
@@ -382,8 +385,6 @@ class GameLogic extends EventEmitter {
     // Phase 7: Next round or end game
     async nextRoundOrEndGame(io, playerManager) {
         if (this.gameState.roundNumber < this.gameState.totalRounds) {
-            //this.gameState.phase = 'nextRound'; // Resetting phase to prevent delay with timer
-            // Store the next round start time (current time + 8 seconds)
             this.gameState.serverTime = Date.now();
             this.gameStateUpdate(io, playerManager);
             // Start an 8-second timer before starting the next round
@@ -393,8 +394,8 @@ class GameLogic extends EventEmitter {
                     // Reset necessary game state properties for the new round
                     this.gameState.phase = 'prompts';
                     delete this.gameState.serverTime; // Remove the timer after it's done
+                    this.gameState.numPlayers = 0;
                     this.gameState.activePrompts = [];
-                    this.gameState.submittedPrompts = [];
                     this.gameState.answers = [];
                     this.gameState.votes = [];
                     this.gameState.updateScores = [];
@@ -411,7 +412,6 @@ class GameLogic extends EventEmitter {
             this.advanceGameState(io, playerManager);
         }
     }
-
     // Phase 8: End game
     async endGame(io, playerManager) {
         this.gameState.phase = 'endGame';
