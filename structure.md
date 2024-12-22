@@ -14,10 +14,9 @@
 │   ├── controllers
 │   |    ├── authController.js
 │   |    └── gameController.js
-|   ├── models
-│   |    └── playerModel.js
 │   └── utils
 |         ├── apiUtils.js
+|         ├── models.js
 |         ├── socketUtils.js
 |         ├── playerManager.js
 |         ├── sessionStore.js

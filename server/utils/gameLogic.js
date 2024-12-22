@@ -5,7 +5,6 @@
 
 const EventEmitter = require('events');
 const apiUtils = require('./apiUtils');
-const e = require('express');
 
 class GameLogic extends EventEmitter {
 
@@ -17,16 +16,14 @@ class GameLogic extends EventEmitter {
     resetGameState() {
         this.gameState = {
             phase: 'joining',
-            activePrompts: [], // [[promptUsername, text]]
-            answers: [], // [[promptUsername, answerUsername, text]]
-            votingOptions: [], // [{ promptText, options: [{ answerUsername, answerText }] }]
-            votes: [], // [[answerUsername, voteUsername]]
-            roundNumber: 1,
-            totalRounds: 3,
-            results : [], // [[ answerUsername, answerText, votes]]
-            updateScores: [], // [[ answerUsername, answerScore ]]
+            activePrompts: [], // [promptObjects]
+            results : [], // [answerObjects]
+            podium: [], // [{position, players: [playerObjects]}]
+            leaderBoard: [], // [playerObjects]
             numPlayers: 0, // Added to keep track of the number of players
             serverTime: 0,
+            roundNumber: 1,
+            totalRounds: 3,
         };
     }
 
@@ -35,104 +32,79 @@ class GameLogic extends EventEmitter {
         return this.gameState;
     }
 
-    async calculateResults() {
-        const voteCounts = {}; // { answerUsername: votes }
-    
-        // Count votes per answerUsername
-        for (const vote of this.gameState.votes) {
-            const [answerUsername, _] = vote; // change to [answerUsername, voteUsername] if needed
-            if (!voteCounts[answerUsername]) {
-                voteCounts[answerUsername] = 0;
-            }
-            voteCounts[answerUsername]++;
-        }
-    
-        // Build results array
-        const results = [];
-        const addedAnswerUsernames = new Set();
-    
-        for (const answer of this.gameState.answers) {
-            const [promptUsername, answerUsername, answerText] = answer;
-    
-            // Ensure each answerUsername is unique
-            if (!addedAnswerUsernames.has(answerUsername)) {
-                const votes = voteCounts[answerUsername] || 0;
-    
-                // Only include answers with votes > 0
-                if (votes > 0) {
-                    results.push([answerUsername, answerText, votes]);
-                    addedAnswerUsernames.add(answerUsername);
-                }
+    calculateResults() {
+        const allAnswers = [];
+        for (const prompt of this.gameState.activePrompts) {
+            for (const answer of prompt.answers) {
+                allAnswers.push(answer);
             }
         }
-        // Sort results in descending order of votes
-        results.sort((a, b) => b[2] - a[2]); // Sort by votes descending
-    
-        return results; // [[ answerUsername, answerText, votes]] descending order by votes
+        // Sort descending by votes.length
+        allAnswers.sort((a, b) => b.votes.length - a.votes.length);
+        this.gameState.results = allAnswers;
     }
 
-    async calculateVoteScores() {
-        const playerScores = {}; // { answerUsername: totalScore }
-        // Calculate scores for each player
-        for (let answer of this.gameState.answers) {
-            const answerUsername = answer[1];
-            const answerVotes = this.gameState.votes.filter((vote) => vote[0] === answerUsername).length;
-            const answerScore = answerVotes * this.gameState.roundNumber * 100;
-    
-            if (!playerScores[answerUsername]) {
-                playerScores[answerUsername] = 0;
-            }
-            playerScores[answerUsername] += answerScore;
-        }
-        // Convert playerScores object to array
-        const scoresArray = Object.keys(playerScores).map(username => {
-            return [username, playerScores[username]];
+    updateLeaderBoard(playerManager) {
+        playerManager.updatePlayersOnResults(this.gameState);
+        const allPlayers = playerManager.getPlayers();
+        allPlayers.sort((a, b) => {
+            const diff = b.score - a.score; // Sort primarily by total score descending
+            // If tie, fallback to alphabetical by username
+            return diff !== 0 ? diff : a.username.localeCompare(b.username);
         });
-        // Sort the array
-        scoresArray.sort((a, b) => {
-            if (b[1] !== a[1]) {
-                // Sort by score descending
-                return b[1] - a[1];
-            } else {
-                // If scores are equal, sort alphabetically
-                return a[0].localeCompare(b[0]);
-            }
-        });
-        // Build the podium (top 5 positions)
+        // 3) Assign sorted players to the leaderBoard
+        this.gameState.leaderBoard = allPlayers;
+    }
+
+    // Build a podium (top 5) from gameState.leaderBoard
+    makePodium() {
+        const playersArray = this.gameState.leaderBoard || [];
         const podium = [];
         let position = 1;
         let i = 0;
-        while (position <= 5 && i < scoresArray.length) {
-            const currentScore = scoresArray[i][1];
+
+        // Group by identical scores, rank the group together
+        while (position <= 5 && i < playersArray.length) {
+            const currentScore = playersArray[i].score;
             const playersAtPosition = [];
-    
-            while (i < scoresArray.length && scoresArray[i][1] === currentScore) {
-                playersAtPosition.push([scoresArray[i][0], scoresArray[i][1]]);
+
+            // Group all players who share the same score
+            while (
+                i < playersArray.length &&
+                playersArray[i].score === currentScore
+            ) {
+                playersAtPosition.push(playersArray[i]);
                 i++;
             }
-            podium.push({
-                position: position,
-                players: playersAtPosition
-            });
+            podium.push({ position, players: playersAtPosition });
             position++;
         }
+
         return podium;
     }
 
     async halfPromptsReceived(playerManager) {
         this.gameState.numPlayers = playerManager.getPlayers().length;
-        let needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers / 2 : this.gameState.numPlayers;
+        const needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers / 2 : this.gameState.numPlayers;
         return (this.gameState.activePrompts.length / needPrompts) >= 0.5;
     }
 
     async allAnswersSubmitted(playerManager) {
-        this.gameState.numPlayers = playerManager.getPlayers().length;
-        let needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers / 2 : this.gameState.numPlayers;
-        return this.gameState.answers.length >= needPrompts*2;  
+        const answers = playerManager.getPlayers().map(player => player.answers);
+        return answers.length >= this.gameState.activePrompts.length;  
     }
 
     async allVotesSubmitted(playerManager) {
-        return this.gameState.votes.length >= (playerManager.getPlayers().concat(playerManager.getAudience())).length;
+        const numPlayers = ((playerManager.getPlayers()).concat(playerManager.getAudience())).length;
+        let totalVotes = 0;
+    
+        // Sum up all votes across all prompt answers
+        for (const prompt of this.gameState.activePrompts) {
+            for (const answer of prompt.answers) {
+                totalVotes += answer.votes.length;
+            }
+        }
+        return totalVotes >= (numPlayers * this.gameState.activePrompts.length);
     }
 
     // Updates players and client sockets on the game state
@@ -168,15 +140,16 @@ class GameLogic extends EventEmitter {
             const suggestedPromptResponse = await apiUtils.suggestPrompt('make a random quiplash prompt');
             const suggestedPromptText = suggestedPromptResponse.suggestion;
             if (suggestedPromptText !== 'Cannot generate suggestion') {
-                this.gameState.activePrompts.push(['API', suggestedPromptText]);
-                console.log(`Suggested Prompt Added: [API, "${suggestedPromptText}"]`);
+                prompt = new Prompt('AI Generated', suggestedPromptText);
+                this.gameState.activePrompts.push(prompt);
+                console.log(`Suggested Prompt Added: [API, ${suggestedPromptText}]`);
             } else {
                 console.warn('API could not generate a suggestion.');
             }
         }
     }
 
-    async assignPrompts(io, playerManager) {
+    async assignPrompts(io, playerManager) {// change this 
         const players = playerManager.getPlayers();
         this.gameState.numPlayers = players.length;
         const needPrompts = this.gameState.numPlayers % 2 === 0 ? this.gameState.numPlayers : this.gameState.numPlayers * 2;
@@ -200,7 +173,6 @@ class GameLogic extends EventEmitter {
         for (const prompt of promptsToAssign) {
             const player = shuffledPlayers[playerIndex % this.gameState.numPlayers];
             playerManager.assignPromptToPlayer(player, prompt);
-            console.log(`Assigned Prompt: ${prompt[1]} to ${player.username}`);
             playerIndex++;
         }
         console.log('Prompts Assigned');
@@ -213,21 +185,6 @@ class GameLogic extends EventEmitter {
                 socket.emit('assignedPrompts', { assignedPrompts: player.assignedPrompts });
             }
         }
-    }
-
-    // Helper method to prepare voting options
-    async prepareVotingOptions() {
-        const votingOptions = [];
-        console.log('Starting to prepare voting options...');
-        for (const answer of this.gameState.answers) {
-            const [promptUsername, answerUsername, answerText] = answer;
-            const promptEntry = this.gameState.activePrompts.find(p => p[0] === promptUsername);
-            const promptText = promptEntry ? promptEntry[1] : 'Unknown Prompt';
-            console.log('Voting options pushed:', [answerUsername, promptText, answerText]);
-            votingOptions.push([answerUsername, promptText, answerText]);
-        }
-        console.log('Voting options prepared:', votingOptions);
-        this.gameState.votingOptions = votingOptions;
     }
 
     // Game State Management
@@ -325,10 +282,6 @@ class GameLogic extends EventEmitter {
 
     // Phase 4: Start voting
     async startVoting(io, playerManager) {
-        // Emit voting options
-        await this.prepareVotingOptions();
-        this.gameState.phase = 'voting';
-        this.gameStateUpdate(io, playerManager);
         let elapsedSeconds_4 = 0;
         const intervalId = setInterval(async () => {
             if (await this.allVotesSubmitted(playerManager)) {
@@ -399,7 +352,6 @@ class GameLogic extends EventEmitter {
                     this.gameState.answers = [];
                     this.gameState.votes = [];
                     this.gameState.updateScores = [];
-                    this.gameState.votingOptions = [];
                     this.gameState.results = [];
                     this.gameStateUpdate(io, playerManager);
                     this.advanceGameState(io, playerManager);

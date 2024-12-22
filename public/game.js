@@ -7,6 +7,8 @@ var app = new Vue({
     data: {
         connected: false,
         loggedIn: false,
+        showJoinGameForm: false,
+        showNextPhaseButton: false,
         username: '',
         password: '',
         sessionId: '',
@@ -16,19 +18,25 @@ var app = new Vue({
         successMsg: '',
         suggestionText: '',
         suggestedPrompt: '',
-        selectedOptionIndex: null,
-        gameState: null, // Contains gameLogic object as detailed by gameModel.js
-        playerInfo: null, // Stores player object as detailed by playerModel.js
-        showJoinGameForm: false,
-        showNextPhaseButton: false,
         gameCode: '',
         promptText: '', // Captures user input for prompt submission
-        answers: [], // Captures user input for answers
+        answers: [],     // Captures user input for answers
         promptInputs: [], // For handling multiple prompts
+
+        // Voting-related states
+        currentPromptIndex: 0,   // Tracks which prompt we're currently voting on
+        selectedAnswerIndex: null, // Tracks which answer is selected within that prompt
+
+        // Game and player state
+        gameState: null,   // Contains gameLogic object
+        playerInfo: null,  // Stores player object
+
+        // Timer-related
         timer: 0,
         progressBarWidth: 100,
     },
     methods: {
+        // Chat-related
         handleChat(data) {
             const message = data.username + ': ' + data.message;
             if (this.messages.length + 1 > 10) {
@@ -44,6 +52,8 @@ var app = new Vue({
                 this.errorMsg = 'Not connected to the server.';
             }
         },
+
+        // Registration / Login
         register() {
             this.errorMsg = '';
             this.successMsg = '';
@@ -85,6 +95,8 @@ var app = new Vue({
                 this.errorMsg = 'An error occurred during login.';
             });
         },
+
+        // Game creation / joining
         gameCreate() {
             if (socket) {
                 socket.emit('gameCreate');
@@ -103,6 +115,8 @@ var app = new Vue({
                 this.errorMsg = 'Not connected to the server.';
             }
         },
+
+        // Prompt submission / generation
         submitPrompt() {
             if (socket && this.promptText.trim() !== '') {
                 socket.emit('submitPrompt', { text: this.promptText });
@@ -117,7 +131,11 @@ var app = new Vue({
                 this.errorMsg = 'Not connected to the server.';
             }
         },
-        //Next Phase Request
+        handleSuggestedPrompt(data) {
+            this.suggestedPrompt = data.suggestedPrompt;
+        },
+
+        // Phase progression
         nextPhaseRequest() {
             if (socket) {
                 socket.emit('nextPhaseRequest');
@@ -129,34 +147,38 @@ var app = new Vue({
                 this.errorMsg = 'Not connected to the server.';
             }
         },
-        // Handle suggested prompt from server
-        handleSuggestedPrompt(data) {
-            this.suggestedPrompt = data.suggestedPrompt;
-        },
+
+        // Submitting answers for the "answers" phase
         submitAnswers() {
             if (socket && this.answers.length > 0) {
-                console.log('Submitting answers:', this.answers);
                 socket.emit('submitAnswers', { answers: this.answers });
                 this.answers = [];
+            } else {
+                this.errorMsg = 'Type all answers before submitting!';
             }
         },
-        selectOption(index) {
-            this.selectedOptionIndex = index;
+
+        // Voting: selecting and submitting
+        selectOption(aIndex) {
+            this.selectedAnswerIndex = aIndex;
         },
         submitVote() {
-            if (this.selectedOptionIndex !== null) {
-                const selectedOption = this.gameState.votingOptions[this.selectedOptionIndex];
-                const answerUsername = selectedOption[0];
-                if (socket) {
-                    socket.emit('submitVote', { answerUsername });
-                    this.selectedOptionIndex = null; // Reset selection
-                } else {
-                    this.errorMsg = 'Not connected to the server.';
+            // Submits the vote for the currently selected answer, then advances to the next prompt.
+            if (this.currentPrompt && this.selectedAnswerIndex !== null) {
+                const selectedAnswer = this.currentPrompt.answers[this.selectedAnswerIndex];
+                if (selectedAnswer) {
+                    // Emit the selected answer's username
+                    socket.emit('submitVote', { answerUsername: selectedAnswer.username });
+
+                    // Move to the next prompt
+                    this.currentPromptIndex++;
+                    this.selectedAnswerIndex = null;
                 }
             } else {
-                this.errorMsg = 'Please select an option to vote.';
+                this.errorMsg = 'Please select an answer to vote!';
             }
         },
+
         // Displaying the podium
         getPositionClass(position) {
             switch (position) {
@@ -176,6 +198,7 @@ var app = new Vue({
             if (position === 3) return 'rd';
             return 'th';
         },
+
         // Timer methods
         startTimer() {
             if (this.gameState.serverTime > 0) {
@@ -186,7 +209,7 @@ var app = new Vue({
             }
         },
         updateTimer(duration) {
-            const remaining =  duration - (Date.now() - this.gameState.serverTime);
+            const remaining = duration - (Date.now() - this.gameState.serverTime);
             this.timer = Math.ceil(remaining / 1000); // Convert to seconds, round up
             this.progressBarWidth = (remaining / duration) * 100; // Percentage for progress bar
 
@@ -203,6 +226,7 @@ var app = new Vue({
     },
     watch: {
         'gameState.phase': function(newPhase) {
+            // Start or stop the timer depending on the phase
             if (newPhase === 'nextRound') {
                 this.startTimer();
             } else {
@@ -214,12 +238,27 @@ var app = new Vue({
         this.stopTimer();
     },
     computed: {
-        filteredVotingOptions() {
-            return this.gameState.votingOptions.filter(option => option[0] !== this.username);
-        }
+        // Returns the currently active prompt (minus the user’s own answers if desired)
+        currentPrompt() {
+            if (
+                !this.gameState ||
+                !this.gameState.activePrompts ||
+                this.currentPromptIndex >= this.gameState.activePrompts.length
+            ) {
+                return null;
+            }
+
+            const prompt = this.gameState.activePrompts[this.currentPromptIndex];
+            const filteredAnswers = prompt.answers.filter(ans => ans.username !== this.username); // Filter out the user's own answers
+            return {
+                ...prompt,
+                answers: filteredAnswers
+            };
+        },
     },
 });
 
+// Function to connect to the server using the session ID
 function connect(sessionId) {
     socket = io({
         auth: {
@@ -250,8 +289,17 @@ function connect(sessionId) {
         if (app.gameState.phase === 'nextRound') {
             app.startTimer();
         }
-        const phasesRequiringNextPhase = ['joining', 'prompts', 'answers', 'voting', 'results', 'scores', 'nextRound', 'endGame']; // 
-        if (app.playerInfo.isAdmin){
+        const phasesRequiringNextPhase = [
+            'joining',
+            'prompts',
+            'answers',
+            'voting',
+            'results',
+            'scores',
+            'nextRound',
+            'endGame'
+        ];
+        if (app.playerInfo.isAdmin) {
             app.showNextPhaseButton = phasesRequiringNextPhase.includes(app.gameState.phase);
             console.log('Admin:', app.showNextPhaseButton);
         }

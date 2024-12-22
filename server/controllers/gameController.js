@@ -223,10 +223,10 @@ function handleSubmitAnswers(socket, data, io) {
         const playerManager = game.playerManager;
         const gameLogic = game.gameLogic;
         const player = playerManager.getPlayerByUsername(username);
-        if (player) {
+        if (player && gameLogic.gameState.phase === 'answers') {
             data.answers.forEach((answer, index) => {
                 const prompt = player.assignedPrompts[index];
-                const result = playerManager.submitAnswer(gameLogic.gameState, player, answer, prompt);
+                const result = playerManager.submitAnswer(player, answer, prompt);
                 if (!result.success) {
                     console.error('Error submitting answer:', result.message);
                     socket.emit('error', { message: result.message });

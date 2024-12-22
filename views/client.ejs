@@ -36,7 +36,7 @@
                             <div v-else-if="playerInfo.state === 'active' && gameState.phase === 'prompts'">
                                 <h3>Submit a Prompt!</h3>
                                 <div>
-                                    <input type="text" v-model="promptText" placeholder="Enter your prompt" class="form-control">
+                                    <input type="text" v-model="prompt.text" placeholder="Enter your prompt" class="form-control">
                                     <button @click="submitPrompt" class="btn btn-primary">Submit Prompt</button>
                                 </div>
                                 
@@ -54,35 +54,56 @@
 
                             <!-- 3. Voting -->
                             <div v-else-if="gameState.phase === 'voting' && playerInfo.state === 'active'">
-                                <h3>Vote for the Best Answer</h3>
-                                <div class="proportional-container">
+                                <!-- If there are prompts left to vote on -->
+                                <div v-if="currentPromptIndex < gameState.activePrompts.length">
+                                    <h3>
+                                        Vote for the Best Answer
+                                        <small>
+                                            (Prompt {{ currentPromptIndex + 1 }} of {{ gameState.activePrompts.length }})
+                                        </small>
+                                    </h3>
+                                
+                                    <!-- Display the current prompt text -->
+                                    <h4>{{ currentPrompt.text }}</h4>
+                                
+                                    <!-- Display each answer for the current prompt -->
                                     <div
-                                        v-for="(option, index) in filteredVotingOptions"
-                                        :key="index"
+                                        v-for="(answer, aIndex) in currentPrompt.answers"
+                                        :key="aIndex"
+                                        v-if="answer.username !== username"  <!-- filter out your own answers if needed -->
                                         class="proportional-box voting-option"
-                                        :class="{ selected: selectedOptionIndex === index }"
-                                        @click="selectOption(index)"
+                                        :class="{ selected: selectedAnswerIndex === aIndex }"
+                                        @click="selectOption(aIndex)"
                                     >
-                                        <p><strong>Answer by:</strong> {{ option[0] }}</p>
-                                        <p><strong>Prompt:</strong> {{ option[1] }}</p>
-                                        <p><strong>Answer:</strong> {{ option[2] }}</p>
+                                        <p><strong>Answer by:</strong> {{ answer.username }}</p>
+                                        <p><strong>Answer:</strong> {{ answer.text }}</p>
                                     </div>
+                                
+                                    <!-- Button to submit your vote for the selected answer -->
+                                    <button
+                                        v-if="selectedAnswerIndex !== null"
+                                        @click="submitVote"
+                                        class="btn btn-primary mt-3"
+                                    >
+                                        Submit Vote
+                                    </button>
                                 </div>
-                                <button v-if="selectedOptionIndex !== null" @click="submitVote" class="btn btn-primary mt-3">Submit Vote</button>
+                                <!-- If we have cycled through all prompts, show a waiting message -->
+                                <div v-else>
+                                    <h3>Waiting for players to vote...</h3>
+                                </div>
                             </div>
 
                             <!-- 4. Results -->
                             <div v-else-if="gameState.phase === 'results' && playerInfo.state === 'waitingResults'">
                                 <h3>Results</h3>
                                 <div class="proportional-container">
-                                    <div
-                                        v-for="(result, index) in gameState.results.slice(0,14)"
-                                        :key="index"
-                                        class="proportional-box"
-                                    >
-                                        <p><strong>{{ result[0] }}</strong></p> <!-- answerUsername -->
-                                        <p>{{ result[1] }}</p> <!-- answerText -->
-                                        <p><strong>Votes: {{ result[2] }}</strong></p> <!-- Votes -->
+                                    <div v-for="(result, index) in gameState.results.slice(0,14)" :key="index" class="proportional-box">
+                                        <div v-if result.votes.length >= 1>
+                                            <p><strong>{{ result.username }}</strong></p> <!-- answerUsername -->
+                                            <p>{{ result.text }}</p> <!-- answerText -->
+                                            <p><strong>{result.votes.length} Votes: {{ result.votes }}</strong></p> <!-- Votes -->
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -91,21 +112,31 @@
                             <div v-else-if="gameState.phase === 'scores'">
                                 <h3>Scores</h3>
                                 <div class="podium-container">
-                                    <div
-                                        v-for="(positionData, index) in gameState.updateScores"
-                                        :key="index"
-                                        :class="['podium-box', getPositionClass(positionData.position)]"
-                                    >
+                                    <!-- Iterate over each position group in the podium -->
+                                    <div v-for="(positionData, index) in gameState.podium" key="index" 
+                                        :class="['podium-box', getPositionClass(positionData.position)]">
                                         <div class="podium-position">
                                             {{ positionData.position }}{{ getOrdinalSuffix(positionData.position) }} Place
                                         </div>
+                                    
+                                        <!-- Iterate over all players sharing the same position -->
                                         <div
                                             v-for="(player, pIndex) in positionData.players"
                                             :key="pIndex"
-                                            class="podium-player"
-                                        >
-                                            <div class="podium-player-name">{{ player[0] }}</div>
-                                            <div class="podium-player-score">{{ player[1] }}</div>
+                                            class="podium-player">
+                                            <div class="podium-player-name">{{ player.username }}</div>
+                                    
+                                            <!-- If you're showing round score vs. total score:
+                                                 - Example logic: if roundNumber < totalRounds, show roundScore;
+                                                   else show totalScore. Adjust as you prefer. -->
+                                            <div class="podium-player-score">
+                                                <span v-if="gameState.roundNumber < gameState.totalRounds">
+                                                    Round Score: {{ player.roundScore }}
+                                                </span>
+                                                <span v-else>
+                                                    Game Score: {{ player.score }}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
